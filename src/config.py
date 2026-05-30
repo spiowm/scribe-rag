@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: str = "5432"
 
+    NOTION_TOKEN: str = Field()
+    NOTION_USERS_DB_ID: str = Field()
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
