@@ -8,9 +8,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    POSTGRES_USER: str = Field()
-    POSTGRES_PASSWORD: str = Field()
-    POSTGRES_DB: str = Field()
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "postgres"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
 
@@ -19,10 +19,11 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION_NAME: str = "general"
 
     NOTION_TOKEN: str = Field()
-    NOTION_USERS_DB_ID: str = Field()
+    NOTION_USERS_DB_ID: str = "3052e2ad-04c6-4950-8e1b-cb2f082d70f2"
 
     GEMINI_API_KEY: str = Field()
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
+    GEMINI_LLM_MODEL: str = "gemini-3.1-flash-lite"
 
     @computed_field
     @property

@@ -5,6 +5,8 @@ from llama_index.embeddings.gemini.base import GeminiEmbedding
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Distance, PointStruct, VectorParams
 
+from src.ingestion.schemas import ChunkPayload
+
 
 class QdrantRepository:
     def __init__(
@@ -14,12 +16,12 @@ class QdrantRepository:
         embedding_model: GeminiEmbedding,
     ) -> None:
         self.collection_name = collection_name
-        self.qdrant = AsyncQdrantClient(url=url)
+        self.qdrant_client = AsyncQdrantClient(url=url)
         self.embedding_model = embedding_model
 
     async def ensure_collection(self) -> None:
-        if not await self.qdrant.collection_exists(self.collection_name):
-            await self.qdrant.create_collection(
+        if not await self.qdrant_client.collection_exists(self.collection_name):
+            await self.qdrant_client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(
                     size=3072,
@@ -41,23 +43,38 @@ class QdrantRepository:
             vectors = await self.embedding_model.aget_text_embedding_batch(texts)
 
             for j, node in enumerate(batch_nodes):
+                payload = ChunkPayload(
+                    text=node.text,
+                    **node.metadata,
+                )
+
                 points.append(
                     PointStruct(
                         id=node.node_id,
                         vector=vectors[j],
-                        payload={
-                            "text": node.text,
-                            **node.metadata,
-                        },
+                        payload=payload.model_dump(),
                     )
                 )
 
             if i + batch_size < len(nodes):
                 await asyncio.sleep(2)
 
-        await self.qdrant.upsert(
+        await self.qdrant_client.upsert(
             collection_name=self.collection_name,
             points=points,
         )
 
         return len(points)
+
+    async def search(self, query: str, limit: int = 5) -> list[ChunkPayload]:
+        query_vector = await self.embedding_model.aget_text_embedding(query)
+        results = await self.qdrant_client.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            limit=limit,
+        )
+        return [
+            ChunkPayload.model_validate(point.payload)
+            for point in results.points
+            if point.payload is not None
+        ]

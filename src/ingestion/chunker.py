@@ -3,6 +3,7 @@ from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.core.schema import TextNode
 
 from src.connectors.notion import NotionPage
+from src.ingestion.schemas import ChunkPayload
 
 
 class NotionChunker:
@@ -13,18 +14,27 @@ class NotionChunker:
         if not page.content or not page.content.strip():
             return []
 
+        payload = ChunkPayload(
+            text="",
+            source="notion",
+            source_id=page.id,
+            title=page.title,
+            url=page.url,
+            last_edited=page.last_edited,
+        )
+
         doc = Document(
             text=page.content,
-            metadata={
-                "page_id": page.id,
-                "page_title": page.title,
-                "page_url": page.url,
-                "last_edited": page.last_edited,
-                "source": "notion",
-            },
+            metadata=payload.model_dump(exclude={"text"}),
         )
-        doc.excluded_embed_metadata_keys = ["page_id", "page_url", "last_edited"]
+        doc.excluded_embed_metadata_keys = [
+            "text",
+            "source_type",
+            "data_id",
+            "data_url",
+            "data_last_edited",
+        ]
 
         nodes = self.parser.get_nodes_from_documents([doc])
 
-        return nodes
+        return [node for node in nodes if isinstance(node, TextNode)]

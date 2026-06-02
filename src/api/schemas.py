@@ -7,3 +7,11 @@ class SyncResponse(BaseModel):
     test_page_title: str | None = None
     test_page_content: str | None = None
     chunks_indexed: int | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    reply: str
