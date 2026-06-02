@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -8,4 +6,4 @@ class NotionPage(BaseModel):
     title: str
     url: str
     last_edited: str
-    content: Optional[str] = None
+    content: str | None = None

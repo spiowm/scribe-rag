@@ -12,15 +12,27 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = Field()
     POSTGRES_DB: str = Field()
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: str = "5432"
+    POSTGRES_PORT: int = 5432
+
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION_NAME: str = "general"
 
     NOTION_TOKEN: str = Field()
     NOTION_USERS_DB_ID: str = Field()
 
+    GEMINI_API_KEY: str = Field()
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
+
     @computed_field
     @property
-    def DATABASE_URL(self) -> str:
+    def POSTGRES_URL(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @computed_field
+    @property
+    def QDRANT_URL(self) -> str:
+        return f"http://{self.QDRANT_HOST}:{self.QDRANT_PORT}"
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(BASE_DIR, ".env"),
