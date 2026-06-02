@@ -1,0 +1,591 @@
+[
+  {
+    "object": "page",
+    "id": "25fc1562-8e90-445c-92d0-dd5780a0eb58",
+    "created_time": "2023-01-09T19:41:00.000Z",
+    "last_edited_time": "2026-05-30T11:33:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "5aff5495-28c9-4870-8d3d-bd5a23317fcc"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "114d872b-594c-81f7-9e63-0002ee9b5602"
+    },
+    "cover": null,
+    "icon": {
+      "type": "emoji",
+      "emoji": "🧿"
+    },
+    "parent": {
+      "type": "page_id",
+      "page_id": "4246308a-ffe6-4892-8fba-c763feacd8d5"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Цікаве про кортіму BCI",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Цікаве про кортіму BCI",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/BCI-25fc15628e90445c92d0dd5780a0eb58",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "c82e168f-da76-45a3-86bb-b69db4054567",
+    "created_time": "2020-03-27T00:06:00.000Z",
+    "last_edited_time": "2026-05-29T21:26:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "c2155382-08e2-43cb-a420-708286c0eb67"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "21991998-2b83-4916-949a-e42d4e7d3c97"
+    },
+    "cover": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/411387c3-d915-4095-832a-151fc82e4153/1000029925.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB4664RBNKAVZ%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132549Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJHMEUCIQDEF%2Bj8m6hBFaGFMjY%2F%2FSOtuodWOEP9gRM3MFMckgwVKQIgG5ILbhTd%2FBPF4m1Bo5u7p3CyKxK9wjLifdzU03gghmoqiAQI3P%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARAAGgw2Mzc0MjMxODM4MDUiDG93jzasTZjcT0Hm8ircAwruDTDkWlnuy5i%2FDl49aTTb5XmKN8%2B0BMQ%2B0gNJ9fJMF7pUUtg9eSgm%2BiRJyzFaa9WIy36KaJGtd2uIWY8LPlxLFIt9e2WPUhzfRdpPadECeOryP%2BhtYeKMWdMZ46DmPFSm61JfkFhglvoRCB%2FUkkP%2F%2Fz4BtpyJba1DlJic3iswDEJtICmJ4q7eZjAae8syisGpYH5M8r%2Fx9VESSwlgu84IvVVSHCpvBK9BnWBV95xo53gkuxdYTiXG7UO7nDKwFciXnkXhj1%2F%2FXBQ6i%2FzCQh4L9JofI1fnLGO%2F%2FbiTgAckDdxM6PxXYzvuYnpmAyrTrUNmCxrJ56kWVozSxTtTL7sN5PO7MQGfbiENK5KeN%2FzVpXj7uQGiwWQ8bSmew611Dbg%2ByuKJnTAHEYD9vLVX6JJGLnsEJiacg6RrU80c8lNOzXLBHW8lVgIct3ucitRcW%2FebUdtw6D25TAn1jjvR0Mns%2F%2FYioludK20SYG1k%2FXaWif6NTiv1cb53nnXnsOeKYIy31SnjAJeMrKpLusOVXqd98dE%2BKx73iKeVp3%2BANh2lvMugjbUlscHvu6n%2Fb1vkdHaMBQbs%2FHQpdsse2AHlIRTXLzWAOM0mtWD%2B%2FPuSR%2FbnJcxyeKjorQ%2Ff%2Bx6NMNaK69AGOqUBBxxBe8lBtIU5JNyzPRvGU00CTf%2FsHsjmnu%2F1vQg2vdnl309KsNHtRuBT5Iwe9Kthac%2F39hSkt0DWoU1BJTM6jXP9O33oES8C8r79Otqq3hyHYzG9DBA%2BIQUanuGFdcAD9ySsPhmNWMdwFFY6Vm%2BBLKr9EfSIWVOAySUDHzouzS4dlS4s8KxBEtuK4sbCbym26GSvULJlnByp14pmzyll2151%2BvW%2F&X-Amz-Signature=6d61b2a844ddc8532ad55aa844d743be5a42d2cc74b32b98100a5874497dfbba&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:49.325Z"
+      }
+    },
+    "icon": {
+      "type": "emoji",
+      "emoji": "👥"
+    },
+    "parent": {
+      "type": "block_id",
+      "block_id": "c5386396-814c-424a-8795-908d5865398c"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Full members",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Full members",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/Full-members-c82e168fda7645a386bbb69db4054567",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "34bd45ac-894e-802e-907f-f5e745f8276d",
+    "created_time": "2026-04-23T12:01:00.000Z",
+    "last_edited_time": "2026-05-29T11:50:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ad-bd22-000234bbe1e3"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "944506cb-1e6e-419d-9cf3-e3e49b12fbdc"
+    },
+    "cover": {
+      "type": "external",
+      "external": {
+        "url": "https://www.notion.so/images/page-cover/met_edgar_degas_1874.jpg"
+      }
+    },
+    "icon": {
+      "type": "custom_emoji",
+      "custom_emoji": {
+        "id": "2e8d45ac-894e-80f9-8c35-007ae1470fde",
+        "name": "benya",
+        "url": "https://s3-us-west-2.amazonaws.com/public.notion-static.com/0fd1e7f1-afe6-4dd9-b3b1-75212ef21b09/square-02.png"
+      }
+    },
+    "parent": {
+      "type": "block_id",
+      "block_id": "34bd45ac-894e-80c6-b506-eb994d85353b"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "CR HACK10",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "CR HACK10",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/CR-HACK10-34bd45ac894e802e907ff5e745f8276d",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "45fcd761-288e-4f3c-9510-500e205ce8e0",
+    "created_time": "2024-02-25T20:14:00.000Z",
+    "last_edited_time": "2026-05-29T10:12:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "b7035c91-64ae-4424-9bac-42e66bc61e6d"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ad-bd22-000234bbe1e3"
+    },
+    "cover": null,
+    "icon": {
+      "type": "emoji",
+      "emoji": "📚"
+    },
+    "parent": {
+      "type": "page_id",
+      "page_id": "9160d357-3a8c-4c26-9436-a55c82324913"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Грошові компанії подій",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Грошові компанії подій",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/45fcd761288e4f3c9510500e205ce8e0",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "345d45ac-894e-805e-bc3b-ce27d4591e3f",
+    "created_time": "2026-04-17T11:26:00.000Z",
+    "last_edited_time": "2026-05-26T20:07:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ea-856b-0002cfd12ee8"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "21991998-2b83-4916-949a-e42d4e7d3c97"
+    },
+    "cover": null,
+    "icon": {
+      "type": "emoji",
+      "emoji": "♾️"
+    },
+    "parent": {
+      "type": "page_id",
+      "page_id": "384782ae-d858-4d02-8fc6-cbf81cc7fb5b"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "24th board aka 24EVER",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "24th board aka 24EVER",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/24th-board-aka-24EVER-345d45ac894e805ebc3bce27d4591e3f",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "5cfcea9e-8e5d-4f32-9a46-2bdc67ecffc9",
+    "created_time": "2020-03-22T16:31:00.000Z",
+    "last_edited_time": "2026-05-26T19:43:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "d54e5008-50a0-4507-9195-1213a86b82c6"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "21991998-2b83-4916-949a-e42d4e7d3c97"
+    },
+    "cover": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/79b6418f-5045-4603-95b7-3c7392d2e81f/best_big_picture_pm.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466UIV67LUO%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJHMEUCIQDwv56K5UBWoNq1jdaUyORvRUlf6T9vnRfxQWDqCxgZPwIgHmA1ZPZjGXKdZBxH06uzYhNlgAQpzAvn15d9H2Qph4cqiAQI3P%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARAAGgw2Mzc0MjMxODM4MDUiDDdKaUv6FwPgMSHP8ircAzh6QHZ46ih%2F%2F2sZenLcCcWwCLnSxULC7QGyK0WZil13PXHv2DmWERaOs4mUhi7QWwmkJkyqr2DJLDvNZhIFyWgp9fEgW8rzl6ORtUgUOVRpWtQBy85IhO4bgMstxMPVtUdRui0wtgj9U2YfGVGlWoU5J7pZtdAG7hZXB1IiGz3WdpJ5hPOaQIvlpNf6gAv994EFg%2BciMBstMYlyL8s4QbdOQNZ17EL8pERC7wv2MdKHKgal6YOg5BQDJnhM0eMYhRlYpYYcyq3OjF1eiyt5%2BrzkygWuv1d5yNOv9OdXmstJvhEVswNey2i1cgRaB5jmafsD77LZ3Vceh27fYuA5AeG9Jk04zHYQ%2BYm8enDltYDVVENhfvK%2FUlgr6i2eVp%2Bm4K2A%2F%2FxtJUEAup23r3gy1oKrJ6Z%2Fo6YmvffA7ONI5PIjhdZE0jXZCqRt71invPduOntxQm%2Bv%2Bre48wV7AhEEn47UVn2x9Nau1cwfBQblYQYkeiWy38qquBjDNLIEgeUL6ugUm4dOfPnmxrQvT99nl6s4EzGG448vDJnpkvw28PH3cpDYnMxyAlKhrWTfs8DNU%2FDCY%2FNpsOrZAIdnlci2psuZN29lAUW4D9Bh6Z3zYk%2FxEjTqPje8hsaU7Hz%2FMNCL69AGOqUBz4%2B6QhYkL%2BI%2BlgcnKGbxYBhOcteVxXhpR0JJqTI%2BVmp%2FIWwMN%2FR4eG6mOFMRGr4SHILAI1KzqIIrSFX%2BvtlQTBz%2FG%2FyBd6K5fz8UdxHRUimus7c6P9rWbPe2ZzaC31Y9hgMQ1nYJmVexZ22mHJNQHn%2F8akyeG5DLtcMjGdpjpyJ%2BD%2FasbKx61o6W8LaGc6P1tgSTqlPQ5Y42YTyeuccnjJHKQ%2BMy&X-Amz-Signature=f41b4f486a8287bec9cb43021b2b83024d511023179286bd4bbe1207222f0c0f&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.061Z"
+      }
+    },
+    "icon": {
+      "type": "emoji",
+      "emoji": "📜"
+    },
+    "parent": {
+      "type": "block_id",
+      "block_id": "c5386396-814c-424a-8795-908d5865398c"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Історія BEST Lviv",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Історія BEST Lviv",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/BEST-Lviv-5cfcea9e8e5d4f329a462bdc67ecffc9",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "b6765abb-297e-43fe-b121-6346cabde3df",
+    "created_time": "2020-01-07T13:15:00.000Z",
+    "last_edited_time": "2026-05-24T14:04:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "c2155382-08e2-43cb-a420-708286c0eb67"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "21991998-2b83-4916-949a-e42d4e7d3c97"
+    },
+    "cover": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/10223e91-ae85-4428-9957-8267ce69dff7/01.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WHL63MB3%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJIMEYCIQDSwAi5mq48ek4urVDsJSSY2Iq1QJySwALeYG8ZNfzR%2BgIhAOCauO1slpkUv4sOf1JdUVR%2BslFph980ItMQtCRu8PJOKogECNz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxKUcLUOBU6zDfeSocq3AOsbUH469yRPtOht1XdWI%2BIS1uxvuERxLlhJvMAdX67BQj13bCEC6HVaM7ERugBD1YWN%2BPc6GluCvEUCEIMBehb94uuetcFkVy2LICrIjFc%2FJc4Np7XjDUNxlXmeh7XLZ6YcTe%2FxHu5Iw00lWqn4QXMkxo8BF%2BwAC4T51gsvT3PB9JChjtf4i2g5yZMIDjz9xO%2F9ZeKYddBDMZ%2FVRzd2J1QgLp86usUF5p6urnxGhKpXfuf84tP6FTa2WrZsyI%2BbOxMk1acrEIuYi1pbvvI28U5st0vnlEszV3H%2FdwFCUPQJ%2BT6ZgFo6yRRy3tC1dY6JSozxZhS0kYtLt2cUjgNqLtjSzBU1hHdjdLpZKOqh5H%2FcDmT6w4qPKK5YZNxetY1eKCxReX%2FA0HpZWDlwpUxY9VQnkw9IUPnqGSS5K%2FkmuxSzfWfK09QwzL4Md6UlNe1j6kyFCGHeA8BAQ7T0S5hovCdnNMMUn0jhYcDZld%2Foq0CjVkSQ%2FuY1zxzXyR1F91J0MxFcs8aV%2F7SAxj9Y5dptthOoHsvPZkKlqQZjB0jrnqtCU%2FWTJg8kSfefW5iL9RPPsJ8dfFkd9g4jPgtf7PwDCfkwBJ4sWlyVuBPI9YuThMJzT%2FSCv1cKONw95N4dzCaievQBjqkAeM8m6ut1IIZH90FuYBfAxZR4cAtcxoZICqwmCo%2FhP%2FfH1o%2F0WGZObTVIftKtI9RBsEAN3dnqnmrQNxFEtzUj1D%2FRIiC8f9183RfFDkPIlAJVY%2BtwvAUZK0e04mgffvb540ubuIbVYu1JGKvKW7TyAO3XVtPMjnWvhz2cpAbwGa%2B5TyHKvL5qiqn2NbFNJAdIT71cgQW9GsYlLVXXL0RGDOhQCBf&X-Amz-Signature=c613751255d38a9992bb2dc7d5eeb9582b1933e4c5336cac29d494b8920f7790&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.836Z"
+      }
+    },
+    "icon": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/b71b0d7c-ca1e-4eb6-a80b-d60c9ac5adfb/BEST_logomark_circle.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WHL63MB3%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJIMEYCIQDSwAi5mq48ek4urVDsJSSY2Iq1QJySwALeYG8ZNfzR%2BgIhAOCauO1slpkUv4sOf1JdUVR%2BslFph980ItMQtCRu8PJOKogECNz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxKUcLUOBU6zDfeSocq3AOsbUH469yRPtOht1XdWI%2BIS1uxvuERxLlhJvMAdX67BQj13bCEC6HVaM7ERugBD1YWN%2BPc6GluCvEUCEIMBehb94uuetcFkVy2LICrIjFc%2FJc4Np7XjDUNxlXmeh7XLZ6YcTe%2FxHu5Iw00lWqn4QXMkxo8BF%2BwAC4T51gsvT3PB9JChjtf4i2g5yZMIDjz9xO%2F9ZeKYddBDMZ%2FVRzd2J1QgLp86usUF5p6urnxGhKpXfuf84tP6FTa2WrZsyI%2BbOxMk1acrEIuYi1pbvvI28U5st0vnlEszV3H%2FdwFCUPQJ%2BT6ZgFo6yRRy3tC1dY6JSozxZhS0kYtLt2cUjgNqLtjSzBU1hHdjdLpZKOqh5H%2FcDmT6w4qPKK5YZNxetY1eKCxReX%2FA0HpZWDlwpUxY9VQnkw9IUPnqGSS5K%2FkmuxSzfWfK09QwzL4Md6UlNe1j6kyFCGHeA8BAQ7T0S5hovCdnNMMUn0jhYcDZld%2Foq0CjVkSQ%2FuY1zxzXyR1F91J0MxFcs8aV%2F7SAxj9Y5dptthOoHsvPZkKlqQZjB0jrnqtCU%2FWTJg8kSfefW5iL9RPPsJ8dfFkd9g4jPgtf7PwDCfkwBJ4sWlyVuBPI9YuThMJzT%2FSCv1cKONw95N4dzCaievQBjqkAeM8m6ut1IIZH90FuYBfAxZR4cAtcxoZICqwmCo%2FhP%2FfH1o%2F0WGZObTVIftKtI9RBsEAN3dnqnmrQNxFEtzUj1D%2FRIiC8f9183RfFDkPIlAJVY%2BtwvAUZK0e04mgffvb540ubuIbVYu1JGKvKW7TyAO3XVtPMjnWvhz2cpAbwGa%2B5TyHKvL5qiqn2NbFNJAdIT71cgQW9GsYlLVXXL0RGDOhQCBf&X-Amz-Signature=024b47936622ce9ed54595c34712f1d0e1ef3749e5656acdc20ef582b2d8e2de&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.836Z"
+      }
+    },
+    "parent": {
+      "type": "block_id",
+      "block_id": "b2b3c872-f69c-4a62-8b39-e7824bc88f47"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "BEST International",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "BEST International",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/BEST-International-b6765abb297e43feb1216346cabde3df",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "2f6d45ac-894e-80de-ab3e-dbb5e6d7d643",
+    "created_time": "2026-01-28T13:18:00.000Z",
+    "last_edited_time": "2026-05-23T18:45:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "6879f736-b908-483d-935c-3f04ce77db4d"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ad-bd22-000234bbe1e3"
+    },
+    "cover": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/56c2f4cd-33d6-4952-a9ae-92a9b4dc7ca3/EJF-banner.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WHL63MB3%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJIMEYCIQDSwAi5mq48ek4urVDsJSSY2Iq1QJySwALeYG8ZNfzR%2BgIhAOCauO1slpkUv4sOf1JdUVR%2BslFph980ItMQtCRu8PJOKogECNz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxKUcLUOBU6zDfeSocq3AOsbUH469yRPtOht1XdWI%2BIS1uxvuERxLlhJvMAdX67BQj13bCEC6HVaM7ERugBD1YWN%2BPc6GluCvEUCEIMBehb94uuetcFkVy2LICrIjFc%2FJc4Np7XjDUNxlXmeh7XLZ6YcTe%2FxHu5Iw00lWqn4QXMkxo8BF%2BwAC4T51gsvT3PB9JChjtf4i2g5yZMIDjz9xO%2F9ZeKYddBDMZ%2FVRzd2J1QgLp86usUF5p6urnxGhKpXfuf84tP6FTa2WrZsyI%2BbOxMk1acrEIuYi1pbvvI28U5st0vnlEszV3H%2FdwFCUPQJ%2BT6ZgFo6yRRy3tC1dY6JSozxZhS0kYtLt2cUjgNqLtjSzBU1hHdjdLpZKOqh5H%2FcDmT6w4qPKK5YZNxetY1eKCxReX%2FA0HpZWDlwpUxY9VQnkw9IUPnqGSS5K%2FkmuxSzfWfK09QwzL4Md6UlNe1j6kyFCGHeA8BAQ7T0S5hovCdnNMMUn0jhYcDZld%2Foq0CjVkSQ%2FuY1zxzXyR1F91J0MxFcs8aV%2F7SAxj9Y5dptthOoHsvPZkKlqQZjB0jrnqtCU%2FWTJg8kSfefW5iL9RPPsJ8dfFkd9g4jPgtf7PwDCfkwBJ4sWlyVuBPI9YuThMJzT%2FSCv1cKONw95N4dzCaievQBjqkAeM8m6ut1IIZH90FuYBfAxZR4cAtcxoZICqwmCo%2FhP%2FfH1o%2F0WGZObTVIftKtI9RBsEAN3dnqnmrQNxFEtzUj1D%2FRIiC8f9183RfFDkPIlAJVY%2BtwvAUZK0e04mgffvb540ubuIbVYu1JGKvKW7TyAO3XVtPMjnWvhz2cpAbwGa%2B5TyHKvL5qiqn2NbFNJAdIT71cgQW9GsYlLVXXL0RGDOhQCBf&X-Amz-Signature=f45df49d7bb1a53051cfd5e8c133c8f3365091b1948970693524eb1f4a33da68&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.836Z"
+      }
+    },
+    "icon": {
+      "type": "custom_emoji",
+      "custom_emoji": {
+        "id": "174d45ac-894e-8008-a8d3-007a1bbd334d",
+        "name": "bcf-logomark",
+        "url": "https://s3-us-west-2.amazonaws.com/public.notion-static.com/c077c3bf-ab12-42f7-8709-9935dabd7520/Proplogomark.png"
+      }
+    },
+    "parent": {
+      "type": "page_id",
+      "page_id": "2e7d45ac-894e-80ff-8bad-da0fa0a75557"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "BEST Survival guide ІЯК’18",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "BEST Survival guide ІЯК’18",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/BEST-Survival-guide-18-2f6d45ac894e80deab3edbb5e6d7d643",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "369d45ac-894e-80cc-9d22-ceccc53a404b",
+    "created_time": "2026-05-23T11:19:00.000Z",
+    "last_edited_time": "2026-05-23T12:32:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ea-856b-0002cfd12ee8"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "c5878228-e80c-4cff-b52c-80edb4965a28"
+    },
+    "cover": null,
+    "icon": {
+      "type": "emoji",
+      "emoji": "🐧"
+    },
+    "parent": {
+      "type": "page_id",
+      "page_id": "2b9d45ac-894e-80ef-a5f4-cd0839330700"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Факти про кортіму",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Факти про кортіму",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/369d45ac894e80cc9d22ceccc53a404b",
+    "public_url": null,
+    "archived": false
+  },
+  {
+    "object": "page",
+    "id": "2b9d45ac-894e-80ef-a5f4-cd0839330700",
+    "created_time": "2025-11-28T21:59:00.000Z",
+    "last_edited_time": "2026-05-23T11:19:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "21991998-2b83-4916-949a-e42d4e7d3c97"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "1c7d872b-594c-81ea-856b-0002cfd12ee8"
+    },
+    "cover": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/f14f43eb-6b8d-4d5d-bd25-ba8d56954da4/1ff99d27-d07f-4904-a841-12ea63c4ce18.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WHL63MB3%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJIMEYCIQDSwAi5mq48ek4urVDsJSSY2Iq1QJySwALeYG8ZNfzR%2BgIhAOCauO1slpkUv4sOf1JdUVR%2BslFph980ItMQtCRu8PJOKogECNz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxKUcLUOBU6zDfeSocq3AOsbUH469yRPtOht1XdWI%2BIS1uxvuERxLlhJvMAdX67BQj13bCEC6HVaM7ERugBD1YWN%2BPc6GluCvEUCEIMBehb94uuetcFkVy2LICrIjFc%2FJc4Np7XjDUNxlXmeh7XLZ6YcTe%2FxHu5Iw00lWqn4QXMkxo8BF%2BwAC4T51gsvT3PB9JChjtf4i2g5yZMIDjz9xO%2F9ZeKYddBDMZ%2FVRzd2J1QgLp86usUF5p6urnxGhKpXfuf84tP6FTa2WrZsyI%2BbOxMk1acrEIuYi1pbvvI28U5st0vnlEszV3H%2FdwFCUPQJ%2BT6ZgFo6yRRy3tC1dY6JSozxZhS0kYtLt2cUjgNqLtjSzBU1hHdjdLpZKOqh5H%2FcDmT6w4qPKK5YZNxetY1eKCxReX%2FA0HpZWDlwpUxY9VQnkw9IUPnqGSS5K%2FkmuxSzfWfK09QwzL4Md6UlNe1j6kyFCGHeA8BAQ7T0S5hovCdnNMMUn0jhYcDZld%2Foq0CjVkSQ%2FuY1zxzXyR1F91J0MxFcs8aV%2F7SAxj9Y5dptthOoHsvPZkKlqQZjB0jrnqtCU%2FWTJg8kSfefW5iL9RPPsJ8dfFkd9g4jPgtf7PwDCfkwBJ4sWlyVuBPI9YuThMJzT%2FSCv1cKONw95N4dzCaievQBjqkAeM8m6ut1IIZH90FuYBfAxZR4cAtcxoZICqwmCo%2FhP%2FfH1o%2F0WGZObTVIftKtI9RBsEAN3dnqnmrQNxFEtzUj1D%2FRIiC8f9183RfFDkPIlAJVY%2BtwvAUZK0e04mgffvb540ubuIbVYu1JGKvKW7TyAO3XVtPMjnWvhz2cpAbwGa%2B5TyHKvL5qiqn2NbFNJAdIT71cgQW9GsYlLVXXL0RGDOhQCBf&X-Amz-Signature=e0180ea99c723246b48ab71ffa5fc27144263a5cc21865aa8c2c401ffe1594f5&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.836Z"
+      }
+    },
+    "icon": {
+      "type": "file",
+      "file": {
+        "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/a004f358-75cb-419e-9774-cb05eb7ab32a/be787ef5-31a8-4417-8b4a-593946956d48/LEoE.svg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WHL63MB3%2F20260530%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260530T132556Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBMaCXVzLXdlc3QtMiJIMEYCIQDSwAi5mq48ek4urVDsJSSY2Iq1QJySwALeYG8ZNfzR%2BgIhAOCauO1slpkUv4sOf1JdUVR%2BslFph980ItMQtCRu8PJOKogECNz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxKUcLUOBU6zDfeSocq3AOsbUH469yRPtOht1XdWI%2BIS1uxvuERxLlhJvMAdX67BQj13bCEC6HVaM7ERugBD1YWN%2BPc6GluCvEUCEIMBehb94uuetcFkVy2LICrIjFc%2FJc4Np7XjDUNxlXmeh7XLZ6YcTe%2FxHu5Iw00lWqn4QXMkxo8BF%2BwAC4T51gsvT3PB9JChjtf4i2g5yZMIDjz9xO%2F9ZeKYddBDMZ%2FVRzd2J1QgLp86usUF5p6urnxGhKpXfuf84tP6FTa2WrZsyI%2BbOxMk1acrEIuYi1pbvvI28U5st0vnlEszV3H%2FdwFCUPQJ%2BT6ZgFo6yRRy3tC1dY6JSozxZhS0kYtLt2cUjgNqLtjSzBU1hHdjdLpZKOqh5H%2FcDmT6w4qPKK5YZNxetY1eKCxReX%2FA0HpZWDlwpUxY9VQnkw9IUPnqGSS5K%2FkmuxSzfWfK09QwzL4Md6UlNe1j6kyFCGHeA8BAQ7T0S5hovCdnNMMUn0jhYcDZld%2Foq0CjVkSQ%2FuY1zxzXyR1F91J0MxFcs8aV%2F7SAxj9Y5dptthOoHsvPZkKlqQZjB0jrnqtCU%2FWTJg8kSfefW5iL9RPPsJ8dfFkd9g4jPgtf7PwDCfkwBJ4sWlyVuBPI9YuThMJzT%2FSCv1cKONw95N4dzCaievQBjqkAeM8m6ut1IIZH90FuYBfAxZR4cAtcxoZICqwmCo%2FhP%2FfH1o%2F0WGZObTVIftKtI9RBsEAN3dnqnmrQNxFEtzUj1D%2FRIiC8f9183RfFDkPIlAJVY%2BtwvAUZK0e04mgffvb540ubuIbVYu1JGKvKW7TyAO3XVtPMjnWvhz2cpAbwGa%2B5TyHKvL5qiqn2NbFNJAdIT71cgQW9GsYlLVXXL0RGDOhQCBf&X-Amz-Signature=8eb5e85ddd763012aacbe7381aca20f7f9245a48d7c97b10287db04620bd8c43&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+        "expiry_time": "2026-05-30T14:25:56.836Z"
+      }
+    },
+    "parent": {
+      "type": "block_id",
+      "block_id": "78ae428f-4460-43a4-a112-95c7875cea38"
+    },
+    "in_trash": false,
+    "is_archived": false,
+    "is_locked": false,
+    "properties": {
+      "title": {
+        "id": "title",
+        "type": "title",
+        "title": [
+          {
+            "type": "text",
+            "text": {
+              "content": "LEoE",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "LEoE",
+            "href": null
+          }
+        ]
+      }
+    },
+    "url": "https://www.notion.so/LEoE-2b9d45ac894e80efa5f4cd0839330700",
+    "public_url": null,
+    "archived": false
+  }
+]

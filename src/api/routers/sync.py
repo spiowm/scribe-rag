@@ -1,12 +1,14 @@
 import json
 
 from fastapi import APIRouter, Depends
+from llama_index.core.schema import TextNode
 
-from src.api.dependencies import get_notion_connector
+from src.api.dependencies import get_notion_connector, get_qdrant_repository
 from src.api.schemas import SyncResponse
 from src.connectors.notion import NotionConnector
 from src.connectors.schemas import NotionPage
 from src.ingestion.chunker import NotionChunker
+from src.vectorstore.qdrant import QdrantRepository
 
 router = APIRouter(
     prefix="/sync",
@@ -15,10 +17,14 @@ router = APIRouter(
 
 
 @router.post("/notion", response_model=SyncResponse)
-async def sync_notion_to_db(notion: NotionConnector = Depends(get_notion_connector)):
+async def sync_notion_to_db(
+    notion: NotionConnector = Depends(get_notion_connector),
+    qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
+):
     # pages = await notion.fetch_all_pages()
 
-    with open("regular_pages.json", "r", encoding="utf-8") as f:
+    # тимчасовий мок на 10 сторінок =============
+    with open("regular_pages_10.json", "r", encoding="utf-8") as f:
         cached_data = json.load(f)
 
     pages = [
@@ -32,26 +38,28 @@ async def sync_notion_to_db(notion: NotionConnector = Depends(get_notion_connect
         )
         for p in cached_data
     ]
+    # тимчасовий мок на 10 сторінок =============
 
     if not pages:
         return SyncResponse(
             status="error",
             found_pages=0,
-            test_page_title=None,
-            test_page_content=None,
         )
 
-    first_page = pages[0]
-    first_page_id = first_page.id
-    first_page_id = "4246308affe648928fbac763feacd8d5"
-
-    first_page.content = await notion.get_page_markdown(first_page_id)
     chunker = NotionChunker()
-    nodes = chunker.chunk_page(first_page)
+
+    all_nodes: list[TextNode] = []
+    for page in pages:
+        page.content = await notion.get_page_markdown(page.id)
+        nodes = chunker.chunk_page(page)
+        all_nodes.extend(nodes)
+
+    await qdrant_repository.upsert_nodes(all_nodes)
 
     return SyncResponse(
         status="success",
         found_pages=len(pages),
-        test_page_title=first_page.title,
-        test_page_content=first_page.content,
+        test_page_title=pages[0].title,
+        test_page_content=pages[0].content,
+        chunks_indexed=len(all_nodes),
     )

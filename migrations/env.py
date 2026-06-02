@@ -12,7 +12,7 @@ from src.models.chat_session import ChatSession  # noqa: F401
 from src.models.user import User  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.POSTGRES_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
