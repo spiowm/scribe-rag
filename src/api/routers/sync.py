@@ -1,12 +1,9 @@
-import json
-
 from fastapi import APIRouter, Depends
 from llama_index.core.schema import TextNode
 
 from src.api.dependencies import get_notion_connector, get_qdrant_repository
 from src.api.schemas import SyncResponse
 from src.connectors.notion import NotionConnector
-from src.connectors.schemas import NotionPage
 from src.ingestion.chunker import NotionChunker
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -21,24 +18,7 @@ async def sync_notion_to_db(
     notion: NotionConnector = Depends(get_notion_connector),
     qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
 ):
-    # pages = await notion.fetch_all_pages()
-
-    # тимчасовий мок на 10 сторінок =============
-    with open("regular_pages_10.json", "r", encoding="utf-8") as f:
-        cached_data = json.load(f)
-
-    pages = [
-        NotionPage(
-            id=p["id"],
-            title=p["properties"]["title"]["title"][0]["plain_text"]
-            if p["properties"]["title"]["title"]
-            else "Без назви",
-            url=p.get("url", ""),
-            last_edited=p.get("last_edited_time", ""),
-        )
-        for p in cached_data
-    ]
-    # тимчасовий мок на 10 сторінок =============
+    pages = await notion.fetch_all_pages()
 
     if not pages:
         return SyncResponse(

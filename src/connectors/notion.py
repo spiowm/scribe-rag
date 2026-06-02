@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 
@@ -19,13 +20,21 @@ class NotionConnector:
 
     async def fetch_all_pages(self) -> list[NotionPage]:
         """Бере всі сторінки з Notion (без сторінок з баз данних)"""
-        pages = await async_collect_paginated_api(
-            self.notion.search,
-            filter={
-                "property": "object",
-                "value": "page",
-            },
-        )
+
+        # тимчасовий мок на 10 сторінок =============
+        with open("tests/regular_pages_10.json", "r", encoding="utf-8") as f:
+            pages = json.load(f)
+
+        # тимчасовий мок на 10 сторінок =============
+
+        # pages = await async_collect_paginated_api(
+        #     self.notion.search,
+        #     filter={
+        #         "property": "object",
+        #         "value": "page",
+        #     },
+        # )
+
         # Відсікання сторінок, що в базах даних
         regular_pages = [p for p in pages if p["parent"]["type"] != "data_source_id"]
 
@@ -60,7 +69,14 @@ class NotionConnector:
         md_content = re.sub(r"<mention-user\s*[^>]*\s*/?>", "", md_content)
         md_content = re.sub(r"</?callout\s*[^>]*\s*/?>", "", md_content)
         md_content = re.sub(r"</?span\s*[^>]*\s*/?>", "", md_content)
-
+        # Видалення Notion color/style атрибутів: {color="pink_bg"} тощо
+        md_content = re.sub(r"{[^}]*}", "", md_content)
+        # Заміна HTML тегів <br> на звичайний перенос рядка
+        md_content = re.sub(r"<br\s*/?>", "\n", md_content)
+        # Видалення database блоків: <database ...>...</database>
+        md_content = re.sub(
+            r"<database[^>]*>.*?</database>", "", md_content, flags=re.DOTALL
+        )
         # Очищищення зайвих переносів рядків
         md_content = re.sub(r"\n\s*\n\s*\n+", "\n\n", md_content)
         return md_content.strip()
