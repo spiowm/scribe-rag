@@ -5,13 +5,14 @@ from aiogram import Bot, Dispatcher
 
 from src.api_client import ApiClient
 from src.config import settings
-from src.handlers import chat
+from src.handlers import chat, commands
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher()
 
+dp.include_router(commands.router)
 dp.include_router(chat.router)
 
 
