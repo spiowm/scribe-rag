@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_LLM_MODEL: str = "gemini-3.1-flash-lite"
 
+    MONGO_URI: str = Field()
+    MONGO_DB: str = "infobook"
+    MONGO_USERS_COLLECTION: str = "users"
+
     @computed_field
     @property
     def POSTGRES_URL(self) -> str:

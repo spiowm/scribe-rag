@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from src.config import settings
 from src.models.base import Base
 from src.models.chat_session import ChatSession  # noqa: F401
+from src.models.message import Message  # noqa: F401
 from src.models.user import User  # noqa: F401
 
 config = context.config

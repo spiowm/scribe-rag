@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiogram>=3.28.2",
+    "aiogram>=3.29.0",
     "httpx>=0.28.1",
     "pydantic-settings>=2.14.1",
     "telegramify-markdown>=1.1.5",
