@@ -5,9 +5,11 @@ from fastapi import FastAPI
 from llama_index.embeddings.gemini.base import GeminiEmbedding
 from llama_index.llms.gemini import Gemini
 
-from src.api.routers import chat, sync
+from src.api.routers import chat, example, sync
 from src.config import settings
+from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
+from src.db import engine
 from src.generation.chain import RagChain
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -43,9 +45,17 @@ async def lifespan(app: FastAPI):
         qdrant=app.state.qdrant,
     )
 
+    app.state.mongo = MongoConnector(
+        settings.MONGO_URI,
+        settings.MONGO_DB,
+        settings.MONGO_USERS_COLLECTION,
+    )
+
     yield
 
+    await engine.dispose()
     await app.state.qdrant.qdrant_client.close()
+    await app.state.mongo.close()
 
 
 app = FastAPI(
@@ -57,6 +67,7 @@ app = FastAPI(
 
 app.include_router(sync.router)
 app.include_router(chat.router)
+app.include_router(example.router)
 
 
 @app.get("/")
