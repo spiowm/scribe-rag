@@ -1,7 +1,7 @@
 import asyncio
 
 from llama_index.core.schema import TextNode
-from llama_index.embeddings.gemini.base import GeminiEmbedding
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Distance, PointStruct, VectorParams
 
@@ -13,7 +13,7 @@ class QdrantRepository:
         self,
         url: str,
         collection_name: str,
-        embedding_model: GeminiEmbedding,
+        embedding_model: GoogleGenAIEmbedding,
     ) -> None:
         self.collection_name = collection_name
         self.qdrant_client = AsyncQdrantClient(url=url)

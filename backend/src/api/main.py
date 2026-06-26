@@ -2,8 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from llama_index.embeddings.gemini.base import GeminiEmbedding
-from llama_index.llms.gemini import Gemini
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
+from llama_index.llms.google_genai import GoogleGenAI
 
 from src.api.routers import chat, example, sync
 from src.config import settings
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
         settings.NOTION_USERS_DB_ID,
     )
 
-    embedding_model = GeminiEmbedding(
+    embedding_model = GoogleGenAIEmbedding(
         model_name=settings.GEMINI_EMBEDDING_MODEL,
         api_key=settings.GEMINI_API_KEY,
     )
@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     )
     await app.state.qdrant.ensure_collection()
 
-    llm = Gemini(
+    llm = GoogleGenAI(
         model_name=settings.GEMINI_LLM_MODEL,
         api_key=settings.GEMINI_API_KEY,
     )
