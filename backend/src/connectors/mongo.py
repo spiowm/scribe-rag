@@ -1,7 +1,4 @@
-from pymongo import MongoClient
-from pymongo.asynchronous.mongo_client import AsyncMongoClient
-
-from src.config import settings
+from pymongo import AsyncMongoClient
 
 
 class MongoConnector:
@@ -11,6 +8,9 @@ class MongoConnector:
 
     async def ping(self) -> int:
         return await self._members.count_documents({})
+
+    async def find_member_by_phone(self, phone: str) -> dict | None:
+        return await self._members.find_one({"phone_number": phone})
 
     async def close(self) -> None:
         await self._client.close()

@@ -1,12 +1,16 @@
 from collections.abc import AsyncGenerator
 
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.exceptions import HTTPException
 
+from src.api.schemas import ChatRequest
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
 from src.db import async_session_maker
 from src.generation.chain import RagChain
+from src.models.user import User
+from src.repository import users
 from src.vectorstore.qdrant import QdrantRepository
 
 
@@ -29,3 +33,10 @@ def get_rag_chain(request: Request) -> RagChain:
 
 def get_mongo(request: Request) -> MongoConnector:
     return request.app.state.mongo
+
+
+async def get_user(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> User:
+    user = await users.get_user_by_telegram_id(db, request.telegram_id)
+    if user is None:
+        raise HTTPException(403, "not_linked")
+    return user

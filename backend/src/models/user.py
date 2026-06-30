@@ -11,7 +11,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    telegram_username: Mapped[str] = mapped_column(String, nullable=True)
+    telegram_username: Mapped[str] = mapped_column(String, nullable=False)
     first_name: Mapped[str] = mapped_column(String, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, nullable=True)
+    last_name: Mapped[str] = mapped_column(String, nullable=False)
+    phone_number: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
