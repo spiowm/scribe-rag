@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.llms.google_genai import GoogleGenAI
 
-from src.api.routers import chat, example, sync
+from src.api.routers import auth, chat, example, sync
 from src.config import settings
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
@@ -68,6 +68,7 @@ app = FastAPI(
 app.include_router(sync.router)
 app.include_router(chat.router)
 app.include_router(example.router)
+app.include_router(auth.router)
 
 
 @app.get("/")

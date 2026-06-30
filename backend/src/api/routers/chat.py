@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, get_rag_chain
+from src.api.dependencies import get_rag_chain, get_user
 from src.api.schemas import ChatRequest, ChatResponse
 from src.generation.chain import RagChain
+from src.models.user import User
 
 router = APIRouter(
     prefix="/chat",
@@ -15,7 +16,7 @@ router = APIRouter(
 async def process_message(
     request: ChatRequest,
     chain: RagChain = Depends(get_rag_chain),
-    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_user),
 ):
     reply = await chain.generate_reply(request.message)
 

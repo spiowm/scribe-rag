@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SyncResponse(BaseModel):
@@ -10,8 +10,23 @@ class SyncResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    telegram_id: int
     message: str
 
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class LinkRequest(BaseModel):
+    telegram_id: int
+    telegram_username: str | None = None
+    phone: str
+
+
+class UserResponse(BaseModel):
+    telegram_id: int
+    telegram_username: str
+    first_name: str
+    last_name: str
+    model_config = ConfigDict(from_attributes=True)
