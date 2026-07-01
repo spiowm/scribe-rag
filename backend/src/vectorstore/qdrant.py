@@ -1,5 +1,3 @@
-import asyncio
-
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from qdrant_client import AsyncQdrantClient
@@ -55,9 +53,6 @@ class QdrantRepository:
                         payload=payload.model_dump(),
                     )
                 )
-
-            if i + batch_size < len(nodes):
-                await asyncio.sleep(2)
 
         await self.qdrant_client.upsert(
             collection_name=self.collection_name,
