@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from google.genai import types
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.llms.google_genai import GoogleGenAI
 
@@ -38,6 +39,9 @@ async def lifespan(app: FastAPI):
     llm = GoogleGenAI(
         model_name=settings.GEMINI_LLM_MODEL,
         api_key=settings.GEMINI_API_KEY,
+        generation_config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
+        ),
     )
 
     app.state.rag_chain = RagChain(

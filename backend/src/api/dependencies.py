@@ -4,7 +4,6 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 
-from src.api.schemas import ChatRequest
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
 from src.db import async_session_maker
@@ -35,8 +34,12 @@ def get_mongo(request: Request) -> MongoConnector:
     return request.app.state.mongo
 
 
-async def get_user(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> User:
-    user = await users.get_user_by_telegram_id(db, request.telegram_id)
+async def get_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
+    body = await request.json()
+    telegram_id = body.get("telegram_id")
+    if not telegram_id:
+        raise HTTPException(422, "telegram_id is required")
+    user = await users.get_user_by_telegram_id(db, telegram_id)
     if user is None:
         raise HTTPException(403, "not_linked")
     return user
