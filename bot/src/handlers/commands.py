@@ -2,6 +2,8 @@ from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
+from src.api_client import ApiClient
+
 router = Router()
 
 
@@ -21,3 +23,10 @@ async def cmd_start(message: types.Message):
         "Щоб користуватись ботом, підтверди, що ти член BEST Lviv, надіславши номер телефону",
         reply_markup=kb,
     )
+
+
+@router.message(Command("new"))
+async def cmd_new(message: types.Message, api_client: ApiClient):
+    assert message.from_user
+    await api_client.new_session(message.from_user.id)
+    await message.reply("Нова розмова розпочата")

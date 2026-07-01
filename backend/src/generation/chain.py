@@ -1,7 +1,8 @@
 import logging
 
-from llama_index.core.llms import LLM
+from llama_index.core.llms import LLM, ChatMessage, MessageRole
 
+from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
@@ -18,26 +19,28 @@ class RagChain:
 Обов'язково посилайся на джерело для підтвердження відповіді та отримання додатквої інформації.
 """
 
-    async def generate_reply(self, message: str) -> str:
+    async def generate_reply(self, message: str, history: list[Message]) -> str:
         payloads = await self.qdrant.search(query=message)
 
         if not payloads:
             return "Я не знайшов нічого релевантного у базі знань."
 
-        chunks = []
-        for p in payloads:
-            chunk = f"[Джерело: {p.title} | {p.url}]\n{p.text}"
-            chunks.append(chunk)
-
-        context = "\n\n---\n\n".join(chunks)
-        prompt = (
-            self.system_prompt
-            + f"\n\nКонтекст:\n{context}"
-            + f"\n\nПитання: {message}"
-            + "\n\nВідповідь:"
+        context = "\n\n---\n\n".join(
+            f"[Джерело: {p.title} | {p.url}]\n{p.text}" for p in payloads
         )
-        logger.debug(f"Prompt: {prompt}")
 
-        response = await self.llm.acomplete(prompt=prompt)
+        messages = [ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt)]
 
-        return response.text
+        for m in history:
+            role = MessageRole.USER if m.role == "user" else MessageRole.ASSISTANT
+            messages.append(ChatMessage(role=role, content=m.content))
+
+        messages.append(
+            ChatMessage(
+                role=MessageRole.USER,
+                content=f"Контекст:\n{context}\n\nПитання: {message}",
+            )
+        )
+
+        response = await self.llm.achat(messages=messages)
+        return response.message.content or "Вибач, не вдалось сформувати відповідь"
