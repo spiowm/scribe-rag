@@ -1,9 +1,9 @@
 import httpx
 from aiogram import Bot, Router, types
+from aiogram.types import InputRichMessage
 from aiogram.utils.chat_action import ChatActionSender
 
 from src.api_client import ApiClient
-from src.formatting import render
 
 router = Router()
 
@@ -14,6 +14,14 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
         if message.from_user is None or message.text is None:
             return
         try:
+            await bot.send_rich_message_draft(
+                chat_id=message.chat.id,
+                draft_id=message.message_id,
+                rich_message=InputRichMessage(
+                    html="<tg-thinking>Шукаю відповідь у базі знань...</tg-thinking>"
+                ),
+            )
+
             reply = await api_client.chat(
                 message=message.text, telegram_id=message.from_user.id
             )
@@ -26,8 +34,4 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
     if reply is None:
         await message.reply("Спершу підтверди членство — натисни /start")
         return
-    for i, part in enumerate(await render(reply)):
-        if i == 0:
-            await message.reply(text=part.text, entities=part.entities)
-        else:
-            await message.answer(text=part.text, entities=part.entities)
+    await message.reply_rich(rich_message=InputRichMessage(markdown=reply))
