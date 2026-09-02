@@ -27,6 +27,8 @@ async def lifespan(app: FastAPI):
     embedding_model = GoogleGenAIEmbedding(
         model_name=settings.GEMINI_EMBEDDING_MODEL,
         api_key=settings.GEMINI_API_KEY,
+        num_workers=5,
+        embed_batch_size=10,
     )
 
     app.state.qdrant = QdrantRepository(

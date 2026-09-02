@@ -1,4 +1,4 @@
-import json
+import asyncio
 import logging
 import re
 
@@ -21,19 +21,13 @@ class NotionConnector:
     async def fetch_all_pages(self) -> list[NotionPage]:
         """Бере всі сторінки з Notion (без сторінок з баз данних)"""
 
-        # тимчасовий мок на 10 сторінок =============
-        with open("tests/regular_pages_10.json", "r", encoding="utf-8") as f:
-            pages = json.load(f)
-
-        # тимчасовий мок на 10 сторінок =============
-
-        # pages = await async_collect_paginated_api(
-        #     self.notion.search,
-        #     filter={
-        #         "property": "object",
-        #         "value": "page",
-        #     },
-        # )
+        pages = await async_collect_paginated_api(
+            self.notion.search,
+            filter={
+                "property": "object",
+                "value": "page",
+            },
+        )
 
         # Відсікання сторінок, що в базах даних
         regular_pages = [p for p in pages if p["parent"]["type"] != "data_source_id"]
@@ -80,3 +74,21 @@ class NotionConnector:
         # Очищищення зайвих переносів рядків
         md_content = re.sub(r"\n\s*\n\s*\n+", "\n\n", md_content)
         return md_content.strip()
+
+    async def fetch_pages_content(self, pages: list[NotionPage]) -> int:
+        """Завантажує markdown контент для всіх сторінок паралельно. Повертає кількість невдач"""
+        sem = asyncio.Semaphore(5)  # обмеження на кількість одночасних запитів
+
+        async def load(page: NotionPage) -> bool:
+            async with sem:
+                try:
+                    page.content = await self.get_page_markdown(page.id)
+                    return True
+                except Exception as e:
+                    logger.error(f"Error fetching content for page {page.id}: {e}")
+                    return False
+
+        tasks = [load(page) for page in pages]
+        results = await asyncio.gather(*tasks)
+        failed_count = sum(1 for r in results if not r)
+        return failed_count
