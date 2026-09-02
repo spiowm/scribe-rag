@@ -6,7 +6,7 @@ from google.genai import types
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.llms.google_genai import GoogleGenAI
 
-from src.api.routers import auth, chat, example, sync
+from src.api.routers import auth, chat, sync
 from src.config import settings
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
@@ -46,9 +46,18 @@ async def lifespan(app: FastAPI):
         ),
     )
 
+    condense_llm = GoogleGenAI(
+        model=settings.GEMINI_CONDENSE_MODEL,
+        api_key=settings.GEMINI_API_KEY,
+        generation_config=types.GenerateContentConfig(
+            temperature=0, thinking_config=types.ThinkingConfig(thinking_budget=0)
+        ),
+    )
+
     app.state.rag_chain = RagChain(
         llm=llm,
         qdrant=app.state.qdrant,
+        condense_llm=condense_llm,
     )
 
     app.state.mongo = MongoConnector(
@@ -73,7 +82,6 @@ app = FastAPI(
 
 app.include_router(sync.router)
 app.include_router(chat.router)
-app.include_router(example.router)
 app.include_router(auth.router)
 
 

@@ -18,7 +18,7 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
                 chat_id=message.chat.id,
                 draft_id=message.message_id,
                 rich_message=InputRichMessage(
-                    html="<tg-thinking>Шукаю відповідь у базі знань...</tg-thinking>"
+                    html="<tg-thinking>Думаю...</tg-thinking>"
                 ),
             )
 

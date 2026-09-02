@@ -87,7 +87,7 @@ class QdrantRepository:
 
         return len(points)
 
-    async def search(self, query: str, limit: int = 5) -> list[ChunkPayload]:
+    async def search(self, query: str, limit: int = 15) -> list[ChunkPayload]:
         query_vector = await self.embedding_model.aget_text_embedding(query)
         results = await self.qdrant_client.query_points(
             collection_name=self.alias,

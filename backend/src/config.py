@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = Field()
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_LLM_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_CONDENSE_MODEL: str = "gemini-3.1-flash-lite"
 
     MONGO_URI: str = Field()
     MONGO_DB: str = "infobook"
