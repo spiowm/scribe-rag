@@ -2,6 +2,7 @@ import logging
 
 from llama_index.core.llms import LLM, ChatMessage, MessageRole
 
+from src.generation.prompts import CONDENSE_PROMPT, GLOSSARY, SYSTEM_PROMPT
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -9,33 +10,41 @@ logger = logging.getLogger(__name__)
 
 
 class RagChain:
-    def __init__(self, llm: LLM, qdrant: QdrantRepository):
+    def __init__(self, llm: LLM, condense_llm: LLM, qdrant: QdrantRepository):
         self.llm = llm
+        self.condense_llm = condense_llm
         self.qdrant = qdrant
-        # Системний промпт, який пояснює моделі, як поводитись
-        self.system_prompt = """
-Ти — корисний та дружній AI-асистент організації BEST Lviv.
-Твоє завдання — відповідати на запитання учасників, використовуючи ТІЛЬКИ наданий контекст.
+        self.system_prompt = SYSTEM_PROMPT + GLOSSARY
 
-Вимоги до форматування відповіді (Telegram Rich Markdown):
-1. Структуруй відповідь: використовуй підзаголовки (###), марковані списки (-) та жирний шрифт для ключових слів.
-2. Не вигадуй інформацію, якої немає в контексті. Якщо відповіді немає — чесно скажи про це.
-3. Обов'язково додавай посилання на використані сторінки Notion у кінці відповіді за допомогою блоку:
-<details><summary>📚 Джерела</summary>
+    async def _condense_question(self, message: str, history: list[Message]) -> str:
+        """Метод для перефразування питання у коротку форму, враховуючи історію чатів."""
 
-- [Назва сторінки](посилання)
-</details>
+        if not history:
+            return message
 
-Перед фінальною відповіддю коротко опиши свої кроки аналізу контексту у згорнутому блоці:
-<details><summary>💭 Хід думок</summary>
+        history_str = "\n".join(
+            f"{m.role}: {m.content[:300] if m.role == 'assistant' else m.content}"
+            for m in history[-4:]
+        )
 
-- Яку інформацію знайдено в контексті
-- Чому саме це є відповіддю
-</details>
-"""
+        response = await self.condense_llm.achat(
+            messages=[
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content=CONDENSE_PROMPT.format(
+                        history=history_str, question=message
+                    ),
+                )
+            ]
+        )
+
+        rewritten = response.message.content or message
+        logger.info("condense: %r -> %r", message, rewritten)
+        return rewritten
 
     async def generate_reply(self, message: str, history: list[Message]) -> str:
-        payloads = await self.qdrant.search(query=message)
+        query = await self._condense_question(message, history)
+        payloads = await self.qdrant.search(query=query)
 
         if not payloads:
             return "Я не знайшов нічого релевантного у базі знань."
