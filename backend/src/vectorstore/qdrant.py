@@ -14,7 +14,7 @@ from qdrant_client.http.models import (
     VectorParams,
 )
 
-from src.ingestion.schemas import ChunkPayload
+from src.ingestion.schemas import ChunkPayload, SearchHit
 
 
 class QdrantRepository:
@@ -87,7 +87,7 @@ class QdrantRepository:
 
         return len(points)
 
-    async def search(self, query: str, limit: int = 15) -> list[ChunkPayload]:
+    async def search(self, query: str, limit: int = 15) -> list[SearchHit]:
         query_vector = await self.embedding_model.aget_text_embedding(query)
         results = await self.qdrant_client.query_points(
             collection_name=self.alias,
@@ -95,7 +95,9 @@ class QdrantRepository:
             limit=limit,
         )
         return [
-            ChunkPayload.model_validate(point.payload)
+            SearchHit(
+                score=point.score, chunk=ChunkPayload.model_validate(point.payload)
+            )
             for point in results.points
             if point.payload is not None
         ]

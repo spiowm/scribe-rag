@@ -8,3 +8,8 @@ class ChunkPayload(BaseModel):
     title: str
     url: str
     last_edited: str
+
+
+class SearchHit(BaseModel):
+    score: float
+    chunk: ChunkPayload
