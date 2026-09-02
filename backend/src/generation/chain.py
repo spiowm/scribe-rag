@@ -3,6 +3,7 @@ import logging
 from llama_index.core.llms import LLM, ChatMessage, MessageRole
 
 from src.generation.prompts import CONDENSE_PROMPT, GLOSSARY, SYSTEM_PROMPT
+from src.ingestion.schemas import SearchHit
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -42,15 +43,37 @@ class RagChain:
         logger.info("condense: %r -> %r", message, rewritten)
         return rewritten
 
+    def _debug_block(self, query: str, hits: list[SearchHit]) -> str:
+        """Згорнутий блок із пошуковим запитом і знайденими фрагментами.
+        Тільки для налагодження."""
+
+        def _snippet(text: str, limit: int = 1200) -> str:
+            """Обрізає текст чанка для показу в блоці налагодження."""
+            if len(text) <= limit:
+                return text
+            return text[:limit] + "…"
+
+        inner = "\n".join(
+            f"<details><summary>{h.score:.2f} · {h.chunk.title}</summary>\n\n"
+            f"````\n{_snippet(h.chunk.text)}\n````\n</details>\n"
+            for h in hits
+        )
+
+        return (
+            f"\n\n<details><summary>🔍 Як шукав ({len(hits)} фрагментів)</summary>\n\n"
+            f"Запит: «{query}»\n\n"
+            f"{inner}\n</details>"
+        )
+
     async def generate_reply(self, message: str, history: list[Message]) -> str:
         query = await self._condense_question(message, history)
-        payloads = await self.qdrant.search(query=query)
+        hits = await self.qdrant.search(query=query)
 
-        if not payloads:
+        if not hits:
             return "Я не знайшов нічого релевантного у базі знань."
 
         context = "\n\n---\n\n".join(
-            f"[Джерело: {p.title} | {p.url}]\n{p.text}" for p in payloads
+            f"[Джерело: {h.chunk.title} | {h.chunk.url}]\n{h.chunk.text}" for h in hits
         )
 
         messages = [ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt)]
@@ -67,4 +90,5 @@ class RagChain:
         )
 
         response = await self.llm.achat(messages=messages)
-        return response.message.content or "Вибач, не вдалось сформувати відповідь"
+        answer = response.message.content or "Вибач, не вдалось сформувати відповідь"
+        return answer + self._debug_block(query, hits)
