@@ -1,8 +1,7 @@
 from datetime import UTC, datetime
 
-from llama_index.core.schema import TextNode
+from llama_index.core.schema import MetadataMode, TextNode
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
-from pymongo import collection
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import (
     CreateAlias,
@@ -62,7 +61,7 @@ class QdrantRepository:
 
         points: list[PointStruct] = []
 
-        texts = [node.text for node in nodes]
+        texts = [node.get_content(metadata_mode=MetadataMode.EMBED) for node in nodes]
         vectors = await self.embedding_model.aget_text_embedding_batch(texts)
 
         for i, node in enumerate(nodes):
