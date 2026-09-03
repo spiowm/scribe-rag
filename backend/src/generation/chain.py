@@ -1,4 +1,5 @@
 import logging
+import json
 
 from llama_index.core.llms import LLM, ChatMessage, MessageRole
 
@@ -39,8 +40,22 @@ class RagChain:
             ]
         )
 
-        rewritten = response.message.content or message
-        logger.info("condense: %r -> %r", message, rewritten)
+        raw = response.message.content or ""
+        try:
+            data = json.loads(raw)
+            rewritten = data["query"] or message
+            logger.info(
+                "condense: %r -> %r (залежить=%s)",
+                message,
+                rewritten,
+                data["depends_on_history"],
+            )
+        except (json.JSONDecodeError, KeyError, TypeError):
+            logger.warning(
+                "condense: не вдалось розібрати відповідь, беру оригінал: %r", raw[:120]
+            )
+            rewritten = message
+
         return rewritten
 
     def _debug_block(self, query: str, hits: list[SearchHit]) -> str:
@@ -91,4 +106,5 @@ class RagChain:
 
         response = await self.llm.achat(messages=messages)
         answer = response.message.content or "Вибач, не вдалось сформувати відповідь"
-        return answer + self._debug_block(query, hits)
+
+        return answer

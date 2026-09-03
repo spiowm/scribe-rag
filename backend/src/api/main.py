@@ -14,7 +14,7 @@ from src.db import engine
 from src.generation.chain import RagChain
 from src.vectorstore.qdrant import QdrantRepository
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
@@ -27,8 +27,11 @@ async def lifespan(app: FastAPI):
     embedding_model = GoogleGenAIEmbedding(
         model_name=settings.GEMINI_EMBEDDING_MODEL,
         api_key=settings.GEMINI_API_KEY,
-        num_workers=5,
+        num_workers=2,
         embed_batch_size=10,
+        retries=6,
+        retry_min_seconds=2,
+        retry_max_seconds=60,
     )
 
     app.state.qdrant = QdrantRepository(
@@ -50,7 +53,9 @@ async def lifespan(app: FastAPI):
         model=settings.GEMINI_CONDENSE_MODEL,
         api_key=settings.GEMINI_API_KEY,
         generation_config=types.GenerateContentConfig(
-            temperature=0, thinking_config=types.ThinkingConfig(thinking_budget=0)
+            temperature=0,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            response_mime_type="application/json",
         ),
     )
 

@@ -1,9 +1,13 @@
+import logging
+
 import httpx
 from aiogram import Bot, Router, types
 from aiogram.types import InputRichMessage
 from aiogram.utils.chat_action import ChatActionSender
 
 from src.api_client import ApiClient
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -31,7 +35,8 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
             )
             return
 
-    if reply is None:
+    if not reply:
         await message.reply("Спершу підтверди членство — натисни /start")
         return
+    logger.info("reply: %d символів, починається з %r", len(reply), reply[:80])
     await message.reply_rich(rich_message=InputRichMessage(markdown=reply))
