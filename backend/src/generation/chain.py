@@ -1,110 +1,150 @@
 import logging
-import json
 
-from llama_index.core.llms import LLM, ChatMessage, MessageRole
+from google import genai
+from google.genai import types
 
-from src.generation.prompts import CONDENSE_PROMPT, GLOSSARY, SYSTEM_PROMPT
-from src.ingestion.schemas import SearchHit
+from src.generation.prompts import GLOSSARY, SYSTEM_PROMPT
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
 
 
+SEARCH_TOOL = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="search_knowledge_base",
+            description=(
+                "Шукає у базі знань BEST Lviv — сторінки Notion про процеси, івенти, "
+                "ролі, людей, історію та традиції осередку.\n"
+                "Викликай не лише тоді, коли потрібні факти, а й коли готуєш ідеї, "
+                "план, аналіз чи пораду: щоб спиратись на те, як усе влаштовано саме "
+                "в BEST, а не на загальні уявлення. Для ідей шукай схожі івенти й "
+                "наявні напрацювання, для аналізу — як цей процес описаний у нас."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "query": types.Schema(
+                        type=types.Type.STRING,
+                        description="Самодостатній пошуковий запит українською",
+                    )
+                },
+                required=["query"],
+            ),
+        )
+    ]
+)
+
+
 class RagChain:
-    def __init__(self, llm: LLM, condense_llm: LLM, qdrant: QdrantRepository):
-        self.llm = llm
-        self.condense_llm = condense_llm
+    def __init__(self, client: genai.Client, model: str, qdrant: QdrantRepository):
+        self.client = client
+        self.model = model
         self.qdrant = qdrant
         self.system_prompt = SYSTEM_PROMPT + GLOSSARY
 
-    async def _condense_question(self, message: str, history: list[Message]) -> str:
-        """Метод для перефразування питання у коротку форму, враховуючи історію чатів."""
-
-        if not history:
-            return message
-
-        history_str = "\n".join(
-            f"{m.role}: {m.content[:300] if m.role == 'assistant' else m.content}"
-            for m in history[-4:]
+        self.config = types.GenerateContentConfig(
+            tools=[SEARCH_TOOL],
+            system_instruction=self.system_prompt,
+            temperature=0.2,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
         )
 
-        response = await self.condense_llm.achat(
-            messages=[
-                ChatMessage(
-                    role=MessageRole.USER,
-                    content=CONDENSE_PROMPT.format(
-                        history=history_str, question=message
-                    ),
-                )
-            ]
+        # Той самий конфіг, але без інструментів — для останнього виклику,
+        # коли цикл вичерпав ітерації й моделі треба відповісти зібраним.
+        self.final_config = types.GenerateContentConfig(
+            system_instruction=self.system_prompt,
+            temperature=0.2,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
-        raw = response.message.content or ""
+    async def _run_search(self, query: str) -> dict:
+        """Виконує пошук і готує результат для моделі."""
         try:
-            data = json.loads(raw)
-            rewritten = data["query"] or message
-            logger.info(
-                "condense: %r -> %r (залежить=%s)",
-                message,
-                rewritten,
-                data["depends_on_history"],
-            )
-        except (json.JSONDecodeError, KeyError, TypeError):
-            logger.warning(
-                "condense: не вдалось розібрати відповідь, беру оригінал: %r", raw[:120]
-            )
-            rewritten = message
+            hits = await self.qdrant.search(query)
+        except Exception:
+            logger.exception("tool search failed: %r", query)
+            return {"error": "пошук тимчасово недоступний"}
 
-        return rewritten
-
-    def _debug_block(self, query: str, hits: list[SearchHit]) -> str:
-        """Згорнутий блок із пошуковим запитом і знайденими фрагментами.
-        Тільки для налагодження."""
-
-        def _snippet(text: str, limit: int = 1200) -> str:
-            """Обрізає текст чанка для показу в блоці налагодження."""
-            if len(text) <= limit:
-                return text
-            return text[:limit] + "…"
-
-        inner = "\n".join(
-            f"<details><summary>{h.score:.2f} · {h.chunk.title}</summary>\n\n"
-            f"````\n{_snippet(h.chunk.text)}\n````\n</details>\n"
-            for h in hits
-        )
-
-        return (
-            f"\n\n<details><summary>🔍 Як шукав ({len(hits)} фрагментів)</summary>\n\n"
-            f"Запит: «{query}»\n\n"
-            f"{inner}\n</details>"
-        )
+        logger.info("tool search: %r -> %d фрагментів", query, len(hits))
+        return {
+            "results": [
+                {
+                    "title": h.chunk.title,
+                    "url": h.chunk.url,
+                    "text": h.chunk.text[:1500],
+                }
+                for h in hits
+            ]
+        }
 
     async def generate_reply(self, message: str, history: list[Message]) -> str:
-        query = await self._condense_question(message, history)
-        hits = await self.qdrant.search(query=query)
 
-        if not hits:
-            return "Я не знайшов нічого релевантного у базі знань."
+        role_map = {"user": "user", "assistant": "model"}
 
-        context = "\n\n---\n\n".join(
-            f"[Джерело: {h.chunk.title} | {h.chunk.url}]\n{h.chunk.text}" for h in hits
-        )
+        contents: list[types.ContentUnion] = [
+            types.Content(
+                role=role_map[m.role],
+                parts=[types.Part(text=m.content)],
+            )
+            for m in history
+        ]
 
-        messages = [ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt)]
-
-        for m in history:
-            role = MessageRole.USER if m.role == "user" else MessageRole.ASSISTANT
-            messages.append(ChatMessage(role=role, content=m.content))
-
-        messages.append(
-            ChatMessage(
-                role=MessageRole.USER,
-                content=f"Контекст:\n{context}\n\nПитання: {message}",
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part(text=message),
+                ],
             )
         )
 
-        response = await self.llm.achat(messages=messages)
-        answer = response.message.content or "Вибач, не вдалось сформувати відповідь"
+        num_iterations = 4
+        for _ in range(num_iterations):
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=self.config,
+            )
+            candidate = response.candidates[0].content if response.candidates else None
+            if candidate is None:
+                return "Вибач, не вдалось сформувати відповідь"
+            calls = [
+                p.function_call for p in (candidate.parts or []) if p.function_call
+            ]
 
-        return answer
+            if not calls:
+                return response.text or "Я не зміг згенерувати відповідь"
+
+            contents.append(candidate)
+            for fc in calls:
+                query = (fc.args or {}).get("query")
+                if not query:
+                    continue
+                result = await self._run_search(query=query)
+                contents.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part(
+                                function_response=types.FunctionResponse(
+                                    name=fc.name,
+                                    response=result,
+                                )
+                            )
+                        ],
+                    )
+                )
+        # Ітерації вичерпані. Замість шаблонної відмови — останній виклик
+        # без інструментів: модель мусить відповісти тим, що вже назбирала.
+        logger.warning("agent: вичерпано %d ітерацій, відповідаю зібраним", num_iterations)
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=contents,
+            config=self.final_config,
+        )
+        return response.text or "Вибач, не вдалось сформувати відповідь"

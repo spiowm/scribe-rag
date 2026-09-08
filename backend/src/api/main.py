@@ -2,9 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from google.genai import types
+from google import genai
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
-from llama_index.llms.google_genai import GoogleGenAI
 
 from src.api.routers import auth, chat, sync
 from src.config import settings
@@ -41,28 +40,12 @@ async def lifespan(app: FastAPI):
     )
     await app.state.qdrant.ensure_collection()
 
-    llm = GoogleGenAI(
-        model=settings.GEMINI_LLM_MODEL,
-        api_key=settings.GEMINI_API_KEY,
-        generation_config=types.GenerateContentConfig(
-            temperature=0.2, thinking_config=types.ThinkingConfig(thinking_budget=0)
-        ),
-    )
-
-    condense_llm = GoogleGenAI(
-        model=settings.GEMINI_CONDENSE_MODEL,
-        api_key=settings.GEMINI_API_KEY,
-        generation_config=types.GenerateContentConfig(
-            temperature=0,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            response_mime_type="application/json",
-        ),
-    )
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     app.state.rag_chain = RagChain(
-        llm=llm,
+        client=client,
+        model=settings.GEMINI_LLM_MODEL,
         qdrant=app.state.qdrant,
-        condense_llm=condense_llm,
     )
 
     app.state.mongo = MongoConnector(
