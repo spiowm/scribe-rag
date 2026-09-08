@@ -29,7 +29,7 @@ async def process_message(
     user: User = Depends(get_user),
 ):
     session = await chats.get_or_create_session(db, user.id)
-    history = await chats.get_recent_messages(db, session.id, limit=20)
+    history = await chats.get_recent_messages(db, session.id, limit=10)
 
     reply = await chain.generate_reply(request.message, history)
 
