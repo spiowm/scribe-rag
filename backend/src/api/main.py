@@ -40,18 +40,19 @@ async def lifespan(app: FastAPI):
     )
     await app.state.qdrant.ensure_collection()
 
+    app.state.mongo = MongoConnector(
+        settings.MONGO_URI,
+        settings.MONGO_DB,
+        settings.MONGO_USERS_COLLECTION,
+    )
+
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     app.state.rag_chain = RagChain(
         client=client,
         model=settings.GEMINI_LLM_MODEL,
         qdrant=app.state.qdrant,
-    )
-
-    app.state.mongo = MongoConnector(
-        settings.MONGO_URI,
-        settings.MONGO_DB,
-        settings.MONGO_USERS_COLLECTION,
+        mongo=app.state.mongo,
     )
 
     yield
