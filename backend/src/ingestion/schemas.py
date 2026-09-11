@@ -7,6 +7,7 @@ class ChunkMetadata(BaseModel):
     title: str
     url: str
     last_edited: str
+    path: str = ""
 
 
 class ChunkPayload(ChunkMetadata):

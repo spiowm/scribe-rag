@@ -71,21 +71,27 @@ class GDriveConnector:
     async def walk(self) -> list[dict]:
         files: list[dict] = []
         seen: set[str] = set(self.root_folder_ids)
-        level = list(self.root_folder_ids)
+        # тягнемо за собою шлях папок: три SAAR.pdf розрізняються лише ним
+        level: list[tuple[str, str]] = [(fid, "") for fid in self.root_folder_ids]
 
         while level:
-            results = await asyncio.gather(*(self.list_children(fid) for fid in level))
-            level = []
-            for items in results:
+            results = await asyncio.gather(
+                *(self.list_children(fid) for fid, _ in level)
+            )
+            next_level: list[tuple[str, str]] = []
+
+            for (_, prefix), items in zip(level, results):
                 for item in items:
                     mine = item.get("mimeType")
                     item_id = item.get("id")
+                    name = item.get("name", "")
+                    child_path = f"{prefix}/{name}" if prefix else name
 
                     #  1. Якщо це папка — йдемо в неї глибше
                     if mine == self.FOLDER:
                         if item_id and item_id not in seen:
                             seen.add(item_id)
-                            level.append(item_id)
+                            next_level.append((item_id, child_path))
 
                     # 2. Якщо це ярлик (shortcut)
                     elif mine == self.SHORTCUT:
@@ -99,15 +105,22 @@ class GDriveConnector:
                         if target_mime == self.FOLDER:
                             if target_id not in seen:
                                 seen.add(target_id)
-                                level.append(target_id)
+                                next_level.append((target_id, child_path))
                         else:
                             files.append(
-                                {**item, "id": target_id, "mimeType": target_mime}
+                                {
+                                    **item,
+                                    "id": target_id,
+                                    "mimeType": target_mime,
+                                    "path": prefix,
+                                }
                             )
 
                     # 3. Звичайний файл — зберігаємо
                     else:
-                        files.append(item)
+                        files.append({**item, "path": prefix})
+
+            level = next_level
 
         return files
 
