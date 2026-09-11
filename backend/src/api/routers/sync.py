@@ -35,6 +35,7 @@ router = APIRouter(
 
 @router.post("/notion", response_model=SyncResponse)
 async def sync_notion_to_db(
+    full: bool = False,
     notion: NotionConnector = Depends(get_notion_connector),
     qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
 ):
@@ -43,7 +44,7 @@ async def sync_notion_to_db(
     if not pages:
         raise HTTPException(status_code=502, detail="No pages found in Notion database")
 
-    state = await qdrant_repository.index_state("notion")
+    state = {} if full else await qdrant_repository.index_state("notion")
     fresh = {p.id: p.last_edited for p in pages}
 
     stale_ids = {
@@ -53,6 +54,7 @@ async def sync_notion_to_db(
     } | (set(state) - set(fresh))  # зниклі
 
     to_process = [p for p in pages if p.id in stale_ids]
+    await notion.resolve_paths(to_process)
     failed_count = await notion.fetch_pages_content(to_process)
 
     failed_ids = {p.id for p in to_process if p.content is None}
@@ -74,6 +76,7 @@ async def sync_notion_to_db(
             source_id=page.id,
             title=page.title,
             url=page.url,
+            path=page.path,
             last_edited=page.last_edited,
         )
         all_nodes.extend(chunker.chunk(text=page.content, metadata=metadata))
