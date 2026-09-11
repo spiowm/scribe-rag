@@ -4,6 +4,8 @@ from datetime import datetime
 from google.genai import types
 
 from src.connectors.mongo import MongoConnector
+from src.db import async_session_maker
+from src.repository import documents
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,50 @@ SEARCH_TOOL = types.Tool(
     ]
 )
 
+GET_DOCUMENT_TOOL = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="get_document",
+            description=(
+                "Читає документ бази знань ЦІЛКОМ, а не фрагментами.\n"
+                "Навіщо: пошук віддає 25 фрагментів з усієї бази, а один "
+                "документ може мати 127 чанків. Тому на питання «дай усі X з "
+                "цього документа» пошук фізично не може відповісти повно: "
+                "у протоколі SAAR 17 голосувань, і один запит приносить 3 з них. "
+                "Ти цього не бачиш — відповідь виглядає повною.\n"
+                "Коли викликати:\n"
+                "• потрібно ВСЕ з одного документа — усі голосування, весь склад, "
+                "уся процедура, усі пункти статуту;\n"
+                "• фрагменти схожі на уривки: обривається перелік, є голоси без "
+                "імен, є пункт 3 без пунктів 1 і 2;\n"
+                "• користувач каже, що відповідь неповна.\n"
+                "Не викликай, якщо на питання вже відповіли фрагменти: "
+                "документ коштує більше контексту.\n"
+                "Спершу зроби пошук, візьми `source_id` з його результату — "
+                "вгадувати або складати його не можна."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "source_id": types.Schema(
+                        type=types.Type.STRING,
+                        description="`source_id` з результату пошуку, дослівно",
+                    ),
+                    "part": types.Schema(
+                        type=types.Type.INTEGER,
+                        description=(
+                            "Частина великого документа, з 1. У відповіді є "
+                            "`parts_total`: якщо їх більше однієї, а потрібного "
+                            "ще немає — бери наступну."
+                        ),
+                    ),
+                },
+                required=["source_id"],
+            ),
+        )
+    ]
+)
+
 FIND_PERSON_TOOL = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
@@ -113,7 +159,12 @@ async def run_search(
     )
     results = []
     for h in hits:
-        item = {"title": h.chunk.title, "url": h.chunk.url, "text": h.chunk.text[:1500]}
+        item = {
+            "source_id": h.chunk.source_id,  # щоб можна було взяти документ цілком
+            "title": h.chunk.title,
+            "url": h.chunk.url,
+            "text": h.chunk.text[:1500],
+        }
         # шлях є лише в файлів з Drive; у Notion його поки немає, і порожнє
         # поле в кожному з 25 фрагментів — це зайвий шум у контексті
         if h.chunk.path:
@@ -137,3 +188,44 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
             for d in docs
         ]
     }
+
+
+PART_CHARS = 60_000  # ~20 тис. токенів на частину
+
+
+async def run_get_document(source_id: str, part: int = 1) -> dict:
+    """Віддає повний текст документа — той самий, що пішов у чанкер."""
+    try:
+        async with async_session_maker() as db:
+            doc = await documents.get_document(db, source_id)
+    except Exception:
+        logger.exception("tool get_document failed: %r", source_id)
+        return {"error": "сховище документів тимчасово недоступне"}
+
+    if doc is None:
+        return {
+            "error": (
+                f"документа з source_id={source_id} немає. "
+                "Візьми source_id дослівно з результату пошуку."
+            )
+        }
+
+    total = max(1, -(-len(doc.text) // PART_CHARS))
+    part = max(1, min(part, total))
+    start = (part - 1) * PART_CHARS
+
+    logger.info(
+        "tool get_document: %r частина %d/%d (%d символів)",
+        doc.title, part, total, len(doc.text),
+    )
+    result = {
+        "title": doc.title,
+        "url": doc.url,
+        "last_edited": doc.last_edited,
+        "part": part,
+        "parts_total": total,
+        "text": doc.text[start : start + PART_CHARS],
+    }
+    if doc.path:
+        result["path"] = doc.path
+    return result

@@ -29,7 +29,7 @@ class RagChain:
         self.system_prompt = SYSTEM_PROMPT + ORG_PRIMER + GLOSSARY
 
         self.config = types.GenerateContentConfig(
-            tools=[tools.SEARCH_TOOL, tools.FIND_PERSON_TOOL],
+            tools=[tools.SEARCH_TOOL, tools.FIND_PERSON_TOOL, tools.GET_DOCUMENT_TOOL],
             system_instruction=self.system_prompt,
             temperature=0.2,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -82,6 +82,11 @@ class RagChain:
         if fc.name == "find_person":
             return await tools.run_find_person(
                 self.mongo, (fc.args or {}).get("name", "")
+            )
+        if fc.name == "get_document":
+            args = fc.args or {}
+            return await tools.run_get_document(
+                args.get("source_id", ""), int(args.get("part") or 1)
             )
         logger.warning("невідомий інструмент: %r", fc.name)
         return {"error": f"невідомий інструмент: {fc.name}"}
