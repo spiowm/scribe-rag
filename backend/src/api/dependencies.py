@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 
+from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
 from src.db import async_session_maker
@@ -32,6 +33,10 @@ def get_rag_chain(request: Request) -> RagChain:
 
 def get_mongo(request: Request) -> MongoConnector:
     return request.app.state.mongo
+
+
+def get_gdrive_connector(request: Request) -> GDriveConnector:
+    return request.app.state.gdrive
 
 
 async def get_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:

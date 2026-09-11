@@ -7,6 +7,7 @@ from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 
 from src.api.routers import auth, chat, sync
 from src.config import settings
+from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
 from src.db import engine
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
 
     app.state.qdrant = QdrantRepository(
         url=settings.QDRANT_URL,
-        collection_name=settings.QDRANT_COLLECTION_NAME,
+        collection_name=settings.QDRANT_NOTION_COLLECTION_NAME,
         embedding_model=embedding_model,
     )
     await app.state.qdrant.ensure_collection()
@@ -44,6 +45,11 @@ async def lifespan(app: FastAPI):
         settings.MONGO_URI,
         settings.MONGO_DB,
         settings.MONGO_USERS_COLLECTION,
+    )
+
+    app.state.gdrive = GDriveConnector(
+        settings.GOOGLE_DRIVE_CREDENTIALS,
+        settings.GOOGLE_DRIVE_ROOTS,
     )
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
@@ -60,6 +66,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
     await app.state.qdrant.qdrant_client.close()
     await app.state.mongo.close()
+    await app.state.gdrive.close()
 
 
 app = FastAPI(

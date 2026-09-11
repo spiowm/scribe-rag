@@ -63,3 +63,15 @@ async def sync_notion_to_db(
         failed_count=failed_count,
         chunks_indexed=len(all_nodes),
     )
+
+
+@router.post("/gdrive", response_model=SyncResponse)
+async def sync_gdrive_to_db(
+
+
+    return SyncResponse(
+        status="success",
+        found_pages=len(pages),
+        failed_count=failed_count,
+        chunks_indexed=len(all_nodes),
+    )
