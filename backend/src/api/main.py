@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
     app.state.qdrant = QdrantRepository(
         url=settings.QDRANT_URL,
-        collection_name=settings.QDRANT_NOTION_COLLECTION_NAME,
+        collection_name=settings.QDRANT_COLLECTION_NAME,
         embedding_model=embedding_model,
     )
     await app.state.qdrant.ensure_collection()

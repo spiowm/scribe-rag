@@ -18,8 +18,7 @@ class Settings(BaseSettings):
 
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
-    QDRANT_NOTION_COLLECTION_NAME: str = "notion"
-    QDRANT_GDRIVE_COLLECTION_NAME: str = "gdrive"
+    QDRANT_COLLECTION_NAME: str = "general"
 
     NOTION_TOKEN: str = Field()
     NOTION_USERS_DB_ID: str = "3052e2ad-04c6-4950-8e1b-cb2f082d70f2"

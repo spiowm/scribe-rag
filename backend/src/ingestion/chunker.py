@@ -2,28 +2,19 @@ from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
 
-from src.connectors.notion import NotionPage
 from src.ingestion.schemas import ChunkMetadata
 
 
-class NotionChunker:
+class Chunker:
     def __init__(self):
         self.parser = SentenceSplitter(chunk_size=800, chunk_overlap=100)
 
-    def chunk_page(self, page: NotionPage) -> list[TextNode]:
-        if not page.content or not page.content.strip():
+    def chunk(self, text: str, metadata: ChunkMetadata) -> list[TextNode]:
+        if not text or not text.strip():
             return []
 
-        metadata = ChunkMetadata(
-            source="notion",
-            source_id=page.id,
-            title=page.title,
-            url=page.url,
-            last_edited=page.last_edited,
-        )
-
         doc = Document(
-            text=page.content,
+            text=text,
             metadata=metadata.model_dump(),
         )
         doc.excluded_embed_metadata_keys = [
