@@ -92,6 +92,7 @@ async def sync_notion_to_db(
 
 @router.post("/gdrive", response_model=SyncResponse)
 async def sync_gdrive_to_db(
+    full: bool = False,
     gdrive: GDriveConnector = Depends(get_gdrive_connector),
     qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
     gemini: genai.Client = Depends(get_gemini_client),
@@ -105,7 +106,10 @@ async def sync_gdrive_to_db(
         if f["mimeType"] in ALLOWED and int(f.get("size", 0)) <= 100 * 1024 * 1024
     ]
 
-    state = await qdrant_repository.index_state("gdrive")
+    # full=True — не порівнюємо з індексом, переганяємо всі файли заново.
+    # Потрібно, коли змінилась схема метаданих: інкрементальний шлях
+    # переносить старі точки як є, і нове поле в них не зʼявиться.
+    state = {} if full else await qdrant_repository.index_state("gdrive")
     fresh = {f["id"]: f["modifiedTime"] for f in targets}
 
     stale_ids = {fid for fid, edited in fresh.items() if state.get(fid) != edited} | (
@@ -151,6 +155,7 @@ async def sync_gdrive_to_db(
             title=f["name"],
             url=f.get("webViewLink", ""),
             last_edited=f["modifiedTime"],
+            path=f.get("path", ""),
         )
         nodes = chunker.chunk(text=text, metadata=metadata)
         if not nodes:

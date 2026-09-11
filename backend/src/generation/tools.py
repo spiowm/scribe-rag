@@ -111,16 +111,15 @@ async def run_search(
     logger.info(
         "tool search: %r terms=%r -> %d фрагментів", query, terms, len(hits)
     )
-    return {
-        "results": [
-            {
-                "title": h.chunk.title,
-                "url": h.chunk.url,
-                "text": h.chunk.text[:1500],
-            }
-            for h in hits
-        ]
-    }
+    results = []
+    for h in hits:
+        item = {"title": h.chunk.title, "url": h.chunk.url, "text": h.chunk.text[:1500]}
+        # шлях є лише в файлів з Drive; у Notion його поки немає, і порожнє
+        # поле в кожному з 25 фрагментів — це зайвий шум у контексті
+        if h.chunk.path:
+            item["path"] = h.chunk.path
+        results.append(item)
+    return {"results": results}
 
 
 async def run_find_person(mongo: MongoConnector, name: str) -> dict:
