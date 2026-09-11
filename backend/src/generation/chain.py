@@ -7,7 +7,7 @@ from google.genai import types
 
 from src.connectors.mongo import MongoConnector
 from src.generation import tools
-from src.generation.prompts import GLOSSARY, SYSTEM_PROMPT
+from src.generation.prompts import GLOSSARY, ORG_PRIMER, SYSTEM_PROMPT
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -26,7 +26,7 @@ class RagChain:
         self.model = model
         self.qdrant = qdrant
         self.mongo = mongo
-        self.system_prompt = SYSTEM_PROMPT + GLOSSARY
+        self.system_prompt = SYSTEM_PROMPT + ORG_PRIMER + GLOSSARY
 
         self.config = types.GenerateContentConfig(
             tools=[tools.SEARCH_TOOL, tools.FIND_PERSON_TOOL],
