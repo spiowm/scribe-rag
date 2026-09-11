@@ -4,13 +4,15 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from google import genai
 from llama_index.core.schema import TextNode
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import (
     get_gdrive_connector,
     get_gemini_client,
     get_notion_connector,
     get_qdrant_repository,
+    get_db,
 )
+from src.repository import documents
 from src.api.schemas import SyncResponse
 from src.config import settings
 from src.connectors.gdrive import GDriveConnector
@@ -38,6 +40,7 @@ async def sync_notion_to_db(
     full: bool = False,
     notion: NotionConnector = Depends(get_notion_connector),
     qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
+    db: AsyncSession = Depends(get_db),
 ):
     pages = await notion.fetch_all_pages()
 
@@ -68,6 +71,8 @@ async def sync_notion_to_db(
 
     all_nodes: list[TextNode] = []
 
+    rows: list[dict] = []
+
     for page in to_process:
         if page.content is None:
             continue
@@ -76,14 +81,28 @@ async def sync_notion_to_db(
             source_id=page.id,
             title=page.title,
             url=page.url,
-            path=page.path,
             last_edited=page.last_edited,
+            path=page.path,
         )
         all_nodes.extend(chunker.chunk(text=page.content, metadata=metadata))
+        rows.append(
+            {
+                "source_id": page.id,
+                "source": "notion",
+                "title": page.title,
+                "path": page.path,
+                "url": page.url,
+                "last_edited": page.last_edited,
+                "text": page.content,
+            }
+        )
 
     indexed = await qdrant_repository.reindex(
         fresh_nodes=all_nodes, stale_ids=stale_ids
     )
+
+    await documents.upsert_documents(db, rows)
+    await documents.delete_documents(db, set(state) - set(fresh))
 
     return SyncResponse(
         status="success",
@@ -99,6 +118,7 @@ async def sync_gdrive_to_db(
     gdrive: GDriveConnector = Depends(get_gdrive_connector),
     qdrant_repository: QdrantRepository = Depends(get_qdrant_repository),
     gemini: genai.Client = Depends(get_gemini_client),
+    db: AsyncSession = Depends(get_db),
 ):
     files = await gdrive.walk()
 
@@ -121,10 +141,15 @@ async def sync_gdrive_to_db(
 
     to_process = [f for f in targets if f["id"] in stale_ids]
 
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(5)  # завантаження з Drive
+    # Окремий ліміт на розпізнавання: це інший ресурс і інший порядок
+    # тривалості. Якби OCR займав слоти завантаження, качання стало б
+    # у чергу за 30-секундними запитами до Gemini.
+    ocr_sem = asyncio.Semaphore(3)
+    chunker = Chunker()
     chunker = Chunker()
 
-    async def process(f: dict) -> list[TextNode]:
+    async def process(f: dict) -> tuple[list[TextNode], dict]:
         mime = f["mimeType"]
         async with sem:
             if mime == GDOC:
@@ -145,12 +170,13 @@ async def sync_gdrive_to_db(
             text, pages = await asyncio.to_thread(pdf_text, blob)
 
         if pages and len(text) / pages < 400:
-            try:
-                text = await gemini_text(
-                    gemini, settings.GEMINI_LLM_MODEL, blob, blob_mime
-                )
-            except Exception as e:
-                logger.warning("gemini не дав текст для %s: %s", f["name"], e)
+            async with ocr_sem:
+                try:
+                    text = await gemini_text(
+                        gemini, settings.GEMINI_LLM_MODEL, blob, blob_mime
+                    )
+                except Exception as e:
+                    logger.warning("gemini не дав текст для %s: %s", f["name"], e)
 
         metadata = ChunkMetadata(
             source="gdrive",
@@ -165,13 +191,23 @@ async def sync_gdrive_to_db(
             logger.warning(
                 "нуль чанків: %s (%d символів, %d стор)", f["name"], len(text), pages
             )
-        return nodes
+        row = {
+            "source_id": f["id"],
+            "source": "gdrive",
+            "title": f["name"],
+            "path": f.get("path", ""),
+            "url": f.get("webViewLink", ""),
+            "last_edited": f["modifiedTime"],
+            "text": text,
+        }
+        return nodes, row
 
     results = await asyncio.gather(
         *(process(f) for f in to_process), return_exceptions=True
     )
 
     all_nodes: list[TextNode] = []
+    rows: list[dict] = []
     failed = 0
     for f, res in zip(to_process, results):
         if isinstance(res, BaseException):
@@ -179,11 +215,15 @@ async def sync_gdrive_to_db(
             logger.warning("не вдалось обробити %s: %s", f["name"], res)
             stale_ids.discard(f["id"])
         else:
-            all_nodes.extend(res)
+            nodes, row = res
+            all_nodes.extend(nodes)
+            rows.append(row)
 
     indexed = await qdrant_repository.reindex(
         fresh_nodes=all_nodes, stale_ids=stale_ids
     )
+    await documents.upsert_documents(db, rows)
+    await documents.delete_documents(db, set(state) - set(fresh))
 
     return SyncResponse(
         status="success",
