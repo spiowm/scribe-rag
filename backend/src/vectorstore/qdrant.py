@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -10,11 +11,15 @@ from qdrant_client.http.models import (
     DeleteAlias,
     DeleteAliasOperation,
     Distance,
-    PointStruct,
-    VectorParams,
     FieldCondition,
     Filter,
+    MatchText,
     MatchValue,
+    PointStruct,
+    TextIndexParams,
+    TextIndexType,
+    TokenizerType,
+    VectorParams,
 )
 
 from src.ingestion.schemas import ChunkPayload, SearchHit
@@ -33,18 +38,51 @@ class QdrantRepository:
         self.qdrant_client = AsyncQdrantClient(url=url)
         self.embedding_model = embedding_model
 
-    async def search(self, query: str, limit: int = 15) -> list[SearchHit]:
-        query_vector = await self.embedding_model.aget_text_embedding(query)
+    async def search(
+        self, query: str, terms: list[str] | None = None, limit: int = 25
+    ) -> list[SearchHit]:
+        """Векторний пошук плюс окремий запит на кожну власну назву.
+
+        Назви вектор знаходить погано: вони самі нічого не означають.
+        Тому на кожну робимо той самий векторний запит, але з фільтром
+        «фрагмент містить це слово» — там кандидатів одиниці, і потрібний
+        виринає. Окремий запит на назву, а не один спільний фільтр: спільний
+        фільтр пропускає обʼєднання, і часта назва знову витісняє рідку.
+
+        Скори порівнянні, бо вектор один і той самий — фільтр змінює не
+        оцінювання, а те, які фрагменти до нього допускаються. Тому злиття
+        це просте сортування, без RRF.
+        """
+        query_vector = await self.embedding_model.aget_query_embedding(query)
+
         results = await self.qdrant_client.query_points(
             collection_name=self.alias,
             query=query_vector,
             limit=limit,
         )
+        points = list(results.points)
+        seen = {point.id for point in points}
+
+        for term in await self._rare_terms(terms or [], max_df=limit * 4):
+            filtered = await self.qdrant_client.query_points(
+                collection_name=self.alias,
+                query=query_vector,
+                limit=limit,
+                query_filter=Filter(
+                    must=[FieldCondition(key="text", match=MatchText(text=term))]
+                ),
+            )
+            for point in filtered.points:
+                if point.id not in seen:
+                    seen.add(point.id)
+                    points.append(point)
+
+        points.sort(key=lambda point: point.score, reverse=True)
         return [
             SearchHit(
                 score=point.score, chunk=ChunkPayload.model_validate(point.payload)
             )
-            for point in results.points
+            for point in points
             if point.payload is not None
         ]
 
@@ -124,6 +162,17 @@ class QdrantRepository:
             vectors_config=VectorParams(
                 size=3072,
                 distance=Distance.COSINE,
+            ),
+        )
+        await self.qdrant_client.create_payload_index(
+            collection_name=name,
+            field_name="text",
+            field_schema=TextIndexParams(
+                type=TextIndexType.TEXT,
+                tokenizer=TokenizerType.MULTILINGUAL,
+                min_token_len=2,
+                max_token_len=20,
+                lowercase=True,
             ),
         )
         return name
@@ -213,6 +262,37 @@ class QdrantRepository:
             )
 
         return len(points)
+
+    async def _rare_terms(self, terms: list[str], max_df: int) -> list[str]:
+        """Лишає до двох найрідкісніших назв із тих, що взагалі є в базі.
+
+        Поріг не про якість — окремий запит на кожну назву й так не дає
+        частій витіснити рідку. Він про те, чи є сенс платити за назву
+        місцем у контексті. Запит із фільтром повертає щонайбільше limit
+        із df тих чанків, що містять слово, тобто показує min(df, limit) / df
+        від усіх згадок. При max_df = 4 * limit це щонайменше чверть — ще
+        пошук. За df 324 («Notion») це 8%, тобто вже просто перетасовка
+        того, що й так знайшлося без фільтра.
+
+        Нуль відсікаємо з іншої причини: якщо модель дала форму, якої в базі
+        немає, запит із таким фільтром вернув би порожнечу.
+        """
+        if not terms:
+            return []
+
+        async def _count(term: str) -> tuple[str, int]:
+            res = await self.qdrant_client.count(
+                collection_name=self.alias,
+                count_filter=Filter(
+                    must=[FieldCondition(key="text", match=MatchText(text=term))]
+                ),
+            )
+            return term, res.count
+
+        counts = await asyncio.gather(*(_count(t) for t in dict.fromkeys(terms)))
+        usable = [(term, cnt) for term, cnt in counts if 0 < cnt <= max_df]
+        usable.sort(key=lambda pair: pair[1])
+        return [term for term, _ in usable[:2]]
 
     async def _cleanup_old_collections(self) -> int:
         """Видаляє всі колекції, крім поточної (за аліасом)"""
