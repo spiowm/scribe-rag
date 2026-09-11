@@ -6,6 +6,7 @@ class NotionPage(BaseModel):
     title: str
     url: str
     last_edited: str
+    path: str = ""
     content: str | None = None
 
 
