@@ -36,7 +36,27 @@ SEARCH_TOOL = types.Tool(
                     "query": types.Schema(
                         type=types.Type.STRING,
                         description="Самодостатній пошуковий запит українською",
-                    )
+                    ),
+                    "terms": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                        description=(
+                            "Власні назви з питання, які мусять бути у фрагменті "
+                            "дослівно: назви формувань і команд, івенти з номером, "
+                            "хвилі набору, прізвища, прізвиська, назви документів. "
+                            "Наприклад: SoDeep, ІЯК17, осінь14, Мінчак, бірко, "
+                            "BEST::HACKath0n.\n"
+                            "Навіщо: пошук по змісту такі слова знаходить погано — "
+                            "вони нічого не означають, а лише вказують на щось "
+                            "конкретне. Якщо в питанні є така назва і ти не передаш "
+                            "її тут, фрагмент про неї може не знайтись зовсім.\n"
+                            "Передавай 1-2 назви в тій формі, у якій їх пишуть "
+                            "у документах (називний відмінок, без відмінювання). "
+                            "Звичайні слова сюди НЕ передавай — ні «традиція», "
+                            "ні «виключення», ні «осередок», ні «фінанси»: "
+                            "для них достатньо query."
+                        ),
+                    ),
                 },
                 required=["query"],
             ),
@@ -78,15 +98,19 @@ FIND_PERSON_TOOL = types.Tool(
 )
 
 
-async def run_search(qdrant: QdrantRepository, query: str) -> dict:
+async def run_search(
+    qdrant: QdrantRepository, query: str, terms: list[str] | None = None
+) -> dict:
     """Виконує пошук і готує результат для моделі."""
     try:
-        hits = await qdrant.search(query)
+        hits = await qdrant.search(query, terms=terms)
     except Exception:
-        logger.exception("tool search failed: %r", query)
+        logger.exception("tool search failed: %r terms=%r", query, terms)
         return {"error": "пошук тимчасово недоступний"}
 
-    logger.info("tool search: %r -> %d фрагментів", query, len(hits))
+    logger.info(
+        "tool search: %r terms=%r -> %d фрагментів", query, terms, len(hits)
+    )
     return {
         "results": [
             {

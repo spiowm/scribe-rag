@@ -75,7 +75,10 @@ class RagChain:
 
     async def _dispatch(self, fc) -> dict:
         if fc.name == "search_knowledge_base":
-            return await tools.run_search(self.qdrant, (fc.args or {}).get("query", ""))
+            args = fc.args or {}
+            return await tools.run_search(
+                self.qdrant, args.get("query", ""), args.get("terms")
+            )
         if fc.name == "find_person":
             return await tools.run_find_person(
                 self.mongo, (fc.args or {}).get("name", "")
