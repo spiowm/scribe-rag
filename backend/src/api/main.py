@@ -52,10 +52,10 @@ async def lifespan(app: FastAPI):
         settings.GOOGLE_DRIVE_ROOTS,
     )
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    app.state.gemini = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     app.state.rag_chain = RagChain(
-        client=client,
+        client=app.state.gemini,
         model=settings.GEMINI_LLM_MODEL,
         qdrant=app.state.qdrant,
         mongo=app.state.mongo,

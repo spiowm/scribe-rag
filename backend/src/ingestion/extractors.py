@@ -1,3 +1,4 @@
+import re
 import io
 import threading
 from google import genai
@@ -8,6 +9,7 @@ from google.genai import types
 
 
 _PDFIUM_LOCK = threading.Lock()
+_BASE64_IMG = re.compile(r"data:[^;]+;base64,[A-Za-z0-9+/=]+")
 
 
 def pdf_text(blob: bytes) -> tuple[str, int]:
@@ -15,10 +17,26 @@ def pdf_text(blob: bytes) -> tuple[str, int]:
         doc = pypdfium2.PdfDocument(blob)
         try:
             pages = len(doc)
-            text = "\n".join(p.get_textpage().get_text_bounded() for p in doc)
+            parts = []
+            for page in doc:
+                textpage = page.get_textpage()
+                try:
+                    parts.append(textpage.get_text_bounded())
+                finally:
+                    textpage.close()
+                    page.close()
+            text = "\n".join(parts)
         finally:
             doc.close()
     return text, pages
+
+
+def markdown_text(blob: bytes) -> tuple[str, int]:
+    """Google Doc, експортований у text/markdown."""
+    text = blob.decode("utf-8", errors="replace")
+    text = _BASE64_IMG.sub("", text)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+    return text.strip(), 0
 
 
 def pptx_text(blob: bytes) -> tuple[str, int]:

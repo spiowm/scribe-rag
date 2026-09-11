@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from google import genai
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,10 @@ def get_mongo(request: Request) -> MongoConnector:
 
 def get_gdrive_connector(request: Request) -> GDriveConnector:
     return request.app.state.gdrive
+
+
+def get_gemini_client(request: Request) -> genai.Client:
+    return request.app.state.gemini
 
 
 async def get_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:

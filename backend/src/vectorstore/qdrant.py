@@ -12,6 +12,9 @@ from qdrant_client.http.models import (
     Distance,
     PointStruct,
     VectorParams,
+    FieldCondition,
+    Filter,
+    MatchValue,
 )
 
 from src.ingestion.schemas import ChunkPayload, SearchHit
@@ -50,8 +53,8 @@ class QdrantRepository:
             collection_name = await self._create_collection()
             await self._switch_alias(collection_name)
 
-    async def index_state(self) -> dict[str, str]:
-        """{source_id: last_edited} — що зараз у живій колекції."""
+    async def index_state(self, source: str) -> dict[str, str]:
+        """{source_id: last_edited} — що зараз у живій колекції для вказаного джерела."""
         current = await self._current_collection()
         if not current:
             return {}
@@ -60,11 +63,21 @@ class QdrantRepository:
         offset = None
         batch_size = 500
 
+        scroll_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="source",
+                    match=MatchValue(value=source),
+                )
+            ]
+        )
+
         while True:
             records, next_offset = await self.qdrant_client.scroll(
                 collection_name=current,
                 offset=offset,
                 limit=batch_size,
+                scroll_filter=scroll_filter,
                 with_payload=["source_id", "last_edited"],
                 with_vectors=False,
             )
