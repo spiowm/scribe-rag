@@ -66,6 +66,92 @@ SEARCH_TOOL = types.Tool(
     ]
 )
 
+QUERY_MEMBERS_TOOL = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="query_members",
+            description=(
+                "Рахує й перелічує членів осередку за довідником. Єдине джерело "
+                "чисел про склад: у текстах їх немає, тому пошук їх не знайде — "
+                "заміряно, що на «скільки фулів», «скільки активних», «скільки "
+                "алюмні» бот без цієї тулзи відповідав неправильно або відмовлявся.\n"
+                "**Обовʼязково** для: «скільки в нас X», «хто має статус X», "
+                "«скільки людей у родині X», «чиї діти», «хто з менторів має "
+                "найбільше дітей», «хто з набору X».\n"
+                "Про набори: щоб сказати щось про людей одної хвилі — хто "
+                "там найстарший, хто ще активний, скільки їх — спершу візьми "
+                "**весь** набір через `joined_from`/`joined_to`. У `people` "
+                "приходять дати народження й вступу, тож порівнювати можна "
+                "вже по них.\n"
+                "Про дітей особливо: у текстах списки «Діти:» є лише для частини "
+                "менторів, і часто **неповні** — тому число з пошуку буває меншим "
+                "за справжнє. Для «скільки в когось дітей» бери цю тулзу, не пошук.\n"
+                "НЕ бери її для: складу чинного борду, історії бордів, кількості "
+                "заявок на набір — це є в документах, і там повніше "
+                "(мінетси кажуть не лише скільки взяли, а й скільки подалось).\n"
+                "У відповіді завжди є `count`. `people` приходить лише коли людей "
+                "мало — інакше список зайняв би весь контекст. Якщо повернувся "
+                "`ambiguous_mentor` — імені мало, перепитай, кого саме мають на увазі."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "status": types.Schema(
+                        type=types.Type.STRING,
+                        enum=["Observer", "Baby", "Full", "Alumni"],
+                        description=(
+                            "Рівень членства. Увага: на борді 9 людей, але фулів "
+                            "серед них 6 — троє на non-board посадах ще не фули."
+                        ),
+                    ),
+                    "state": types.Schema(
+                        type=types.Type.STRING,
+                        enum=["Active", "Inactive"],
+                        description="Активність. Це окреме від статусу поле.",
+                    ),
+                    "family": types.Schema(
+                        type=types.Type.STRING,
+                        enum=["Президенти", "Монголи", "Кролики", "Білики",
+                              "Легофемелі"],
+                        description="Бестівська родина.",
+                    ),
+                    "mentor": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "Ментор (ангел). Достатньо прізвища — воно однозначне "
+                            "для 138 менторів із 142. Порядок слів і прізвиська "
+                            "теж розпізнаються."
+                        ),
+                    ),
+                    "joined_from": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "Вступили не раніше цієї дати, ISO `2024-03-01`. "
+                            "Разом із `joined_to` дає набір: люди одної хвилі "
+                            "мають ОДНАКОВУ дату вступу, тож «весна 2024» — це "
+                            "діапазон лютий-квітень 2024, «осінь24» — "
+                            "вересень-листопад."
+                        ),
+                    ),
+                    "joined_to": types.Schema(
+                        type=types.Type.STRING,
+                        description="Вступили не пізніше цієї дати, ISO.",
+                    ),
+                    "group_by": types.Schema(
+                        type=types.Type.STRING,
+                        enum=["status", "state", "family", "mentor"],
+                        description=(
+                            "Розбити на групи з підрахунком. Так відповідають "
+                            "питання «хто з менторів найбільше», «як розподілені "
+                            "по родинах», «скільки кого за статусами»."
+                        ),
+                    ),
+                },
+            ),
+        )
+    ]
+)
+
 GET_DOCUMENT_TOOL = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
@@ -229,3 +315,32 @@ async def run_get_document(source_id: str, part: int = 1) -> dict:
     if doc.path:
         result["path"] = doc.path
     return result
+
+
+async def run_query_members(mongo: MongoConnector, **kwargs) -> dict:
+    """Підрахунки по довіднику. Порожні аргументи не передаємо далі."""
+    args = {k: v for k, v in kwargs.items() if v not in (None, "")}
+    try:
+        result = await mongo.query_members(**args)
+    except Exception:
+        logger.exception("tool query_members failed: %r", args)
+        return {"error": "довідник членів тимчасово недоступний"}
+
+    logger.info(
+        "tool query_members: %r -> count=%s groups=%s",
+        args, result.get("count"), len(result.get("groups") or []),
+    )
+    return {
+        k: (
+            [
+                {
+                    kk: (vv.isoformat() if isinstance(vv, datetime) else vv)
+                    for kk, vv in person.items()
+                }
+                for person in v
+            ]
+            if k == "people"
+            else v
+        )
+        for k, v in result.items()
+    }

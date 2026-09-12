@@ -7,7 +7,11 @@ from google.genai import types
 
 from src.connectors.mongo import MongoConnector
 from src.generation import tools
-from src.generation.prompts import GLOSSARY, ORG_PRIMER, SYSTEM_PROMPT
+from src.generation.prompts import (
+    GLOSSARY,
+    ORG_PRIMER,
+    SYSTEM_PROMPT,
+)
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -29,7 +33,12 @@ class RagChain:
         self.system_prompt = SYSTEM_PROMPT + ORG_PRIMER + GLOSSARY
 
         self.config = types.GenerateContentConfig(
-            tools=[tools.SEARCH_TOOL, tools.FIND_PERSON_TOOL, tools.GET_DOCUMENT_TOOL],
+            tools=[
+                tools.SEARCH_TOOL,
+                tools.FIND_PERSON_TOOL,
+                tools.GET_DOCUMENT_TOOL,
+                tools.QUERY_MEMBERS_TOOL,
+            ],
             system_instruction=self.system_prompt,
             temperature=0.2,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -88,6 +97,9 @@ class RagChain:
             return await tools.run_get_document(
                 args.get("source_id", ""), int(args.get("part") or 1)
             )
+        if fc.name == "query_members":
+            args = fc.args or {}
+            return await tools.run_query_members(self.mongo, **args)
         logger.warning("невідомий інструмент: %r", fc.name)
         return {"error": f"невідомий інструмент: {fc.name}"}
 
@@ -112,8 +124,11 @@ class RagChain:
             )
         )
 
-        num_iterations = 4
-        for _ in range(num_iterations):
+        # Тулз стало чотири, і типовий складний шлях уже займає 4 ходи:
+        # search -> get_document part 1 -> part 2 -> query_members. На 4
+        # запас нульовий, і в аудиті це вже давало порожню відповідь.
+        num_iterations = 8
+        for step in range(1, num_iterations + 1):
             response = await self.client.aio.models.generate_content(
                 model=self.model,
                 contents=contents,
@@ -129,6 +144,7 @@ class RagChain:
             ]
 
             if not calls:
+                logger.info("agent: %d ходів", step)
                 return response.text or "Я не зміг згенерувати відповідь"
 
             contents.append(candidate)

@@ -30,7 +30,7 @@ dp.shutdown.register(on_shutdown)
 
 
 async def main():
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
