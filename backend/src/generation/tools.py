@@ -268,12 +268,18 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
         return {"error": "довідник членів тимчасово недоступний"}
 
     logger.info("tool find_person: %r -> %d осіб", name, len(docs))
-    return {
-        "people": [
-            {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in d.items()}
-            for d in docs
-        ]
-    }
+
+    def serialize(d: dict) -> dict:
+        return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in d.items()}
+
+    # Повний профіль лише найкращому збігу. Решта — коротко, бо їх достатньо,
+    # щоб перепитати «кого саме», а пʼять повних профілів це ~1250 токенів
+    # на один виклик: заміряно 12 тисяч на одинадцять викликів підряд.
+    SHORT = ("first_name", "last_name", "status", "state", "family", "member_since")
+    people = [serialize(docs[0])] + [
+        serialize({k: v for k, v in d.items() if k in SHORT}) for d in docs[1:]
+    ]
+    return {"people": people, "matched": len(docs)}
 
 
 PART_CHARS = 60_000  # ~20 тис. токенів на частину

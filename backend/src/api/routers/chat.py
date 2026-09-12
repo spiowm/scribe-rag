@@ -31,7 +31,7 @@ async def process_message(
     session = await chats.get_or_create_session(db, user.id)
     history = await chats.get_recent_messages(db, session.id, limit=10)
 
-    reply = await chain.generate_reply(request.message, history)
+    reply = await chain.generate_reply(request.message, history, user.phone_number)
 
     await chats.add_message(db, session.id, "user", request.message)
     await chats.add_message(db, session.id, "assistant", reply)

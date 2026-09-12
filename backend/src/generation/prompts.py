@@ -585,3 +585,59 @@ CONDENSE_PROMPT = """Ти готуєш пошуковий запит до баз
 Останнє питання: {question}
 
 Поверни JSON: {{"depends_on_history": true/false, "query": "..."}}"""
+
+
+def user_context(member: dict | None) -> str:
+    """Блок про співрозмовника для системного промпта."""
+    if member is None:
+        return (
+            "## З ким ти говориш\n\n"
+            "Співрозмовника не впізнано в довіднику. Не вигадуй, хто він, і не "
+            "питай номер — доступ до бота вже підтверджений. На питання про "
+            "«мене» проси уточнити імʼя."
+        )
+
+    name = f"{member.get('first_name', '')} {member.get('last_name', '')}".strip()
+    rows = [f"- Імʼя: **{name}**"]
+    if member.get("status"):
+        rows.append(f"- Статус: {member['status']}")
+    if member.get("board"):
+        rows.append(f"- На борді: {member['board']}")
+    if member.get("family"):
+        rows.append(f"- Родина: {member['family']}")
+    since = member.get("member_since")
+    if since:
+        rows.append(f"- В осередку з: {str(since)[:10]}")
+    if member.get("mentor_name"):
+        rows.append(f"- Ангел (ментор): {member['mentor_name']}")
+    positions = member.get("positions") or []
+    if positions:
+        # Посади йдуть хронологічно, і бордівська зазвичай наприкінці: заміряно,
+        # у перших шести вона лише в 11 людей із 27, в останніх — у 21. Тому
+        # бордівські показуємо завжди, а решту місць віддаємо найсвіжішим.
+        board_kw = ("president", "treasurer", "secretary", "vp4")
+        board = [x for x in positions if any(k in x.lower() for k in board_kw)]
+        recent = [x for x in reversed(positions) if x not in board]
+        shown = board + recent[: max(0, 6 - len(board))]
+        hidden = len(positions) - len(shown)
+        tail = f" (і ще {hidden})" if hidden else ""
+        rows.append(f"- Посади: {'; '.join(shown)}{tail}")
+    profile = "\n".join(rows)
+
+    return (
+        "## З ким ти говориш\n\n"
+        f"{profile}\n\n"
+        "Як цим користуватись:\n"
+        "- Звертайся на імʼя, коли це природно. Не в кожному реченні.\n"
+        "- Це фон для калібрування відповіді, а не те, що треба зачитувати. "
+        "Не переказуй людині її ж профіль без запиту.\n"
+        "- Питання про себе — «хто мій ангел», «які в мене посади», «у якій я "
+        "родині», «коли я вступив» — відповідай звідси, не питаючи, хто він.\n"
+        "- Статус підказує, що людині потрібно: обзерверу на «як стати фулом» "
+        "потрібен шлях для нього самого, а бордівцю на те саме питання — "
+        "найпевніше процедура для когось іншого.\n"
+        "- **Якщо людина каже, що в профілі помилка — права вона.** Довідник "
+        "відстає: статуси й активність оновлюють не щодня. Не спорь із людиною "
+        "про її власні дані й не наполягай на тому, що тут написано.\n"
+        "- Не додумуй, чого людина не знає, за межами очевидного зі статусу."
+    )

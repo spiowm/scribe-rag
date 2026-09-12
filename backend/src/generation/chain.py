@@ -11,6 +11,7 @@ from src.generation.prompts import (
     GLOSSARY,
     ORG_PRIMER,
     SYSTEM_PROMPT,
+    user_context,
 )
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
@@ -41,7 +42,9 @@ class RagChain:
             ],
             system_instruction=self.system_prompt,
             temperature=0.2,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.LOW
+            ),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(
                 disable=True
             ),
@@ -52,7 +55,9 @@ class RagChain:
         self.final_config = types.GenerateContentConfig(
             system_instruction=self.system_prompt,
             temperature=0.2,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=types.ThinkingLevel.LOW
+            ),
             # Відсутності інструментів замало: модель повторює патерн із розмови
             # і все одно просить виклик, а тоді текстових частин немає взагалі.
             # NONE забороняє це явно й змушує відповісти словами.
@@ -63,15 +68,12 @@ class RagChain:
             ),
         )
 
-    def _system_instruction(self) -> str:
-        """Системний промпт із поточною датою.
-
-        Дата підставляється на кожен запит, а не в __init__: процес живе
-        тижнями, і зафіксована на старті дата з часом почала б брехати.
-        """
+    def _system_instruction(self, member: dict | None = None) -> str:
+        """Системний промпт із поточною датою і профілем співрозмовника."""
         today = datetime.now(UTC).strftime("%d.%m.%Y")
         return (
             f"{self.system_prompt}\n\n"
+            f"{user_context(member)}\n\n"
             "## Поточна дата\n\n"
             f"Сьогодні {today}.\n\n"
             "Сторінки бази знань писалися в різний час, і час у них — на момент "
@@ -103,7 +105,10 @@ class RagChain:
         logger.warning("невідомий інструмент: %r", fc.name)
         return {"error": f"невідомий інструмент: {fc.name}"}
 
-    async def generate_reply(self, message: str, history: list[Message]) -> str:
+    async def generate_reply(
+        self, message: str, history: list[Message], phone: str | None = None
+    ) -> str:
+        member = await self.mongo.find_member_by_phone(phone) if phone else None
 
         role_map = {"user": "user", "assistant": "model"}
 
@@ -133,7 +138,7 @@ class RagChain:
                 model=self.model,
                 contents=contents,
                 config=self.config.model_copy(
-                    update={"system_instruction": self._system_instruction()}
+                    update={"system_instruction": self._system_instruction(member)}
                 ),
             )
             candidate = response.candidates[0].content if response.candidates else None
@@ -175,7 +180,7 @@ class RagChain:
             model=self.model,
             contents=contents,
             config=self.final_config.model_copy(
-                update={"system_instruction": self._system_instruction()}
+                update={"system_instruction": self._system_instruction(member)}
             ),
         )
         return response.text or "Вибач, не вдалось сформувати відповідь"
