@@ -13,7 +13,7 @@ async def on_contact(message: types.Message, api_client: ApiClient):
         return
     c = message.contact
     if c.user_id != message.from_user.id:
-        await message.answer("Поділись, будь ласка, *своїм* номеро через кнопку")
+        await message.answer("Поділись, будь ласка, своїм номером через кнопку")
         return
 
     try:
@@ -31,7 +31,9 @@ async def on_contact(message: types.Message, api_client: ApiClient):
 
     if user is None:  # не член
         await message.answer(
-            "На жаль, твого номера нема в інфобуці BEST Lviv",
+            "Не знайшов цей номер в інфобуці BEST Lviv.\n\n"
+            "Якщо ти член осередку, найпевніше в інфобуці записаний інший номер. Напиши @spiowm — оновимо, "
+            "і тоді натисни /start ще раз.",
             reply_markup=ReplyKeyboardRemove(),
         )
         return
