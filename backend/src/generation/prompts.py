@@ -119,6 +119,13 @@ SYSTEM_PROMPT = """
 осередку — **шукай у базі**. Там вони є: у профілі на сторінці алюмні (поле «Посади:»),
 на сторінках бордів («18th board aka BoardHub»), у мінетсах.
 
+**Посади у `find_person` — два поля.** `current_positions` — те, що інфобук
+записує як поточні посади людини, `past_positions` — завершені. Усі посади людини —
+це обидва поля разом. На «хто він зараз», «чи він ще в кортімі» відповідай з
+`current_positions` і кажи «за інфобуком»: поле оновлюють руками й не завжди
+вчасно — у кількох неактивних людей досі висять посади за 2025 рік. Якщо рік у
+посаді вже минув, так і скажи, а не подавай її як поточну.
+
 Що з бази брати можна: рядок, який **сам стверджує** посаду цієї людини — поле
 «Посади:» в її профілі, склад борду на сторінці борду, підпис «фасилітатор Х, president».
 
@@ -663,18 +670,22 @@ def user_context(member: dict | None) -> str:
         rows.append(f"- В осередку з: {str(since)[:10]}")
     if member.get("mentor_name"):
         rows.append(f"- Ангел (ментор): {member['mentor_name']}")
-    positions = member.get("positions") or []
-    if positions:
+    # Поточних посад мало (найбільше 7), тому вони йдуть повністю.
+    current = member.get("current_positions") or []
+    if current:
+        rows.append(f"- Поточні посади (за інфобуком): {'; '.join(current)}")
+    past = member.get("past_positions") or []
+    if past:
         # Посади йдуть хронологічно, і бордівська зазвичай наприкінці: заміряно,
         # у перших шести вона лише в 11 людей із 27, в останніх — у 21. Тому
         # бордівські показуємо завжди, а решту місць віддаємо найсвіжішим.
         board_kw = ("president", "treasurer", "secretary", "vp4")
-        board = [x for x in positions if any(k in x.lower() for k in board_kw)]
-        recent = [x for x in reversed(positions) if x not in board]
+        board = [x for x in past if any(k in x.lower() for k in board_kw)]
+        recent = [x for x in reversed(past) if x not in board]
         shown = board + recent[: max(0, 6 - len(board))]
-        hidden = len(positions) - len(shown)
+        hidden = len(past) - len(shown)
         tail = f" (і ще {hidden})" if hidden else ""
-        rows.append(f"- Посади: {'; '.join(shown)}{tail}")
+        rows.append(f"- Попередні посади: {'; '.join(shown)}{tail}")
     profile = "\n".join(rows)
 
     return (
@@ -685,7 +696,9 @@ def user_context(member: dict | None) -> str:
         "- Це фон для калібрування відповіді, а не те, що треба зачитувати. "
         "Не переказуй людині її ж профіль без запиту.\n"
         "- Питання про себе — «хто мій ангел», «які в мене посади», «у якій я "
-        "родині», «коли я вступив» — відповідай звідси, не питаючи, хто він.\n"
+        "родині», «коли я вступив» — відповідай звідси, не питаючи, хто він. "
+        "Посади тут урізані («і ще N»): на питання саме про посади візьми "
+        "повний список через `find_person` за імʼям людини.\n"
         "- Статус підказує, що людині потрібно: обзерверу на «як стати фулом» "
         "потрібен шлях для нього самого, а бордівцю на те саме питання — "
         "найпевніше процедура для когось іншого.\n"
