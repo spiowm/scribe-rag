@@ -268,6 +268,8 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
         return {"error": "довідник членів тимчасово недоступний"}
 
     logger.info("tool find_person: %r -> %d осіб", name, len(docs))
+    if not docs:
+        return {"people": [], "matched": 0}
 
     def serialize(d: dict) -> dict:
         return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in d.items()}
