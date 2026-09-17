@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 
 from google.genai import types
@@ -230,6 +231,57 @@ FIND_PERSON_TOOL = types.Tool(
 )
 
 
+FIND_BY_POSITION_TOOL = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="find_by_position",
+            description=(
+                "Знаходить людей за ПОСАДОЮ, коли імені не знають: «хто МО "
+                "весняного MW», «хто PR-відповідальний CTF», «є вже МО МВ». "
+                "find_person так не працює — він шукає лише за іменем.\n"
+                "Посади в довіднику записані англійською, як у інфобуці, тому "
+                "перекладай: «мо мв» → `MO MW`, «пр респонсібл» → "
+                "`PR Responsible`, «хостес» → `Hostess`. Скорочення лишай "
+                "скороченнями (MO, PR, DS, CR, LG, CT), не розкривай їх.\n"
+                "**Шукай без року.** Роки в базі пишуть по-різному — "
+                "`MO MW Autumn’26` і `MO MW Spring'2026` — тож рік у запиті "
+                "відрізає правильні збіги. Спитали про цьогорічного МО МВ — "
+                "передай `MO MW` і візьми рік уже з відповіді.\n"
+                "Ролі чинного борду шукаються і за канонічним скороченням "
+                "(`President`, `Treasurer`, `Secretary`, `VP4HR`, `VP4IT`, "
+                "`VP4PR`, `VP4CR`, `VP4DS`, `VP4IR`), і за повною назвою "
+                "(`Vice president for Human Resources`) — бо в довіднику вони "
+                "записані двома способами.\n"
+                "У відповіді: `matched_current` — посада зараз, `matched_past` — "
+                "колишня, і в самому рядку стоїть івент та рік; `board_role` — "
+                "роль у чинному борді. Спершу йдуть ті, хто на посаді зараз. "
+                "`count` більший за довжину `people` означає, що список урізано. "
+                "Якщо прийшов `hint` — це вказівка, як перепитати, а не факт "
+                "про осередок.\n"
+                "Порожній результат означає лише, що в довіднику такого рядка "
+                "немає: посади туди вносять руками й часто із запізненням. "
+                "Це НЕ підстава сказати, що посада вакантна або що конкурс "
+                "ще відкритий — таке можна лише з документа."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "position": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "Назва посади англійською, без року й без питальних "
+                            "слів: `MO MW`, `PR Responsible`, `Logistics Team`. "
+                            "Знайдуться рядки, де стоять усі передані слова."
+                        ),
+                    )
+                },
+                required=["position"],
+            ),
+        )
+    ]
+)
+
+
 async def run_search(
     qdrant: QdrantRepository, query: str, terms: list[str] | None = None
 ) -> dict:
@@ -282,6 +334,38 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
         serialize({k: v for k, v in d.items() if k in SHORT}) for d in docs[1:]
     ]
     return {"people": people, "matched": len(docs)}
+
+
+CYRILLIC = re.compile(r"[а-яіїєґА-ЯІЇЄҐ]")
+
+
+async def run_find_by_position(mongo: MongoConnector, position: str) -> dict:
+    """Шукає людей за посадою в інфобуці"""
+    try:
+        result = await mongo.find_by_position(position)
+    except Exception:
+        logger.exception("tool find_by_position failed: %r", position)
+        return {"error": "довідник членів тимчасово недоступний"}
+
+    logger.info(
+        "tool find_by_position: %r -> %d осіб", position, result.get("count", 0)
+    )
+    if not result.get("count"):
+        # Порожньо буває з двох різних причин, і модель мусить їх розрізняти:
+        # кириличний запит — це наша помилка виклику, а не факт про осередок.
+        if CYRILLIC.search(position):
+            result["hint"] = (
+                "Посади в довіднику записані англійською. Повтори запит "
+                "англійською назвою: «мо мв» → MO MW, «пі ар» → PR Responsible, "
+                "«президент» → President."
+            )
+        else:
+            result["hint"] = (
+                "Такого рядка в довіднику немає. Спробуй коротше (без року й без "
+                "назви івенту) або пошукай документи про вибори. Порожній "
+                "результат НЕ означає, що посада вакантна."
+            )
+    return result
 
 
 PART_CHARS = 60_000  # ~20 тис. токенів на частину
