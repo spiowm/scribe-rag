@@ -37,6 +37,7 @@ class RagChain:
             tools=[
                 tools.SEARCH_TOOL,
                 tools.FIND_PERSON_TOOL,
+                tools.FIND_BY_POSITION_TOOL,
                 tools.GET_DOCUMENT_TOOL,
                 tools.QUERY_MEMBERS_TOOL,
             ],
@@ -102,6 +103,10 @@ class RagChain:
         if fc.name == "query_members":
             args = fc.args or {}
             return await tools.run_query_members(self.mongo, **args)
+        if fc.name == "find_by_position":
+            return await tools.run_find_by_position(
+                self.mongo, (fc.args or {}).get("position", "")
+            )
         logger.warning("невідомий інструмент: %r", fc.name)
         return {"error": f"невідомий інструмент: {fc.name}"}
 

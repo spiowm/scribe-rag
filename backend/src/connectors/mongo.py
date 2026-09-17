@@ -5,6 +5,7 @@ from pymongo import AsyncMongoClient
 
 STATES = ("Active", "Inactive")
 STATUSES = ("Observer", "Baby", "Full", "Alumni")
+POSITION_WORD = re.compile(r"\w+")
 
 
 class MongoConnector:
@@ -49,7 +50,99 @@ class MongoConnector:
         docs = [d async for d in self._members.find({"$or": conditions}, {"_id": 0})]
         docs.sort(key=lambda d: _match_score(d, tokens), reverse=True)
         return docs[:limit]
-        STATUSES = ("Observer", "Baby", "Full", "Alumni")
+
+    async def find_by_position(self, position: str, limit: int = 40) -> dict:
+        """Шукає людей за посадою й вертає ті рядки посад, що збіглися.
+
+        Посади пишуть руками, тому в базі чотири види апострофа, а рік
+        зліплений з назвою («MO MW Autumn’26»). Тому порівнюємо не фразу,
+        а слова: всі слова запиту мають стояти в одному рядку посади.
+
+        `board` шукаємо теж — там `VP4HR`, а в посадах те саме
+        записано як «Vice president for Human Resources».
+        """
+
+        def words(text: str) -> list[str]:
+            return [w.lower() for w in POSITION_WORD.findall(text)]
+
+        def matched(positions: list[str] | None, wanted: list[str]) -> list[str]:
+            hits = []
+            for title in positions or []:
+                have = words(title)
+                # Короткі слова («MO», «PR») — лише повним збігом, інакше «mo»
+                # витягне «Motivation». Довгі — префіксом, щоб «respons»
+                # знаходило «Responsible».
+                if all(
+                    w in have if len(w) <= 3 else any(h.startswith(w) for h in have)
+                    for w in wanted
+                ):
+                    hits.append(title)
+            return hits
+
+        wanted = words(position)
+        if not wanted:
+            return {"count": 0, "people": []}
+
+        # Монго звузить вибірку за найдовшим словом (усі збіги його містять),
+        # а точний відбір по всіх словах зробимо вже на кількох документах.
+        longest = {"$regex": re.escape(max(wanted, key=len)), "$options": "i"}
+
+        people = []
+        async for doc in self._members.find(
+            {
+                "$or": [
+                    {"current_positions": longest},
+                    {"past_positions": longest},
+                    {"board": longest},
+                ]
+            },
+            {
+                "_id": 0,
+                "first_name": 1,
+                "last_name": 1,
+                "status": 1,
+                "state": 1,
+                "family": 1,
+                "board": 1,
+                "current_positions": 1,
+                "past_positions": 1,
+            },
+        ):
+            current = matched(doc.get("current_positions"), wanted)
+            past = matched(doc.get("past_positions"), wanted)
+            board = matched([doc["board"]] if doc.get("board") else None, wanted)
+            if not current and not past and not board:
+                continue
+
+            person = {
+                key: doc.get(key)
+                for key in ("first_name", "last_name", "status", "state", "family")
+            }
+            if board:
+                person["board_role"] = doc["board"]
+            if current:
+                person["matched_current"] = current
+            if past:
+                person["matched_past"] = past
+            people.append(person)
+
+        def rank(person: dict) -> tuple:
+            """Порядок важливіший, ніж здається: модель читає перших.
+
+            Слово «president» є і в «Vice president for IT», тому спершу йде
+            канонічна роль з `board`, далі поточні посади, і всередині — ті,
+            чия назва з запитаного слова починається.
+            """
+            role = person.get("board_role")
+            titles = person.get("matched_current") or person.get("matched_past") or []
+            return (
+                not (role and words(role) == wanted),
+                not (person.get("matched_current") or role),
+                not any(words(t)[:1] == wanted[:1] for t in titles),
+            )
+
+        people.sort(key=rank)
+        return {"count": len(people), "people": people[:limit]}
 
     async def query_members(
         self,
