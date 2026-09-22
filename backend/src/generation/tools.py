@@ -323,8 +323,17 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
     if not docs:
         return {"people": [], "matched": 0}
 
+    # Технічні поля для таблиці інфобука, а не факти про людину: дати в них
+    # масово переписують при зміні борду, і модель робила з них висновки
+    # («завершила активність у квітні»).
+    HIDDEN = ("status_last_changed", "state_last_changed")
+
     def serialize(d: dict) -> dict:
-        return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in d.items()}
+        return {
+            k: (v.isoformat() if isinstance(v, datetime) else v)
+            for k, v in d.items()
+            if k not in HIDDEN
+        }
 
     # Повний профіль лише найкращому збігу. Решта — коротко, бо їх достатньо,
     # щоб перепитати «кого саме», а пʼять повних профілів це ~1250 токенів
