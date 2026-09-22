@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApiClient:
-    def __init__(self, base_url: str, timeout: float = 40.0):
+    def __init__(self, base_url: str, timeout: float = 180.0):
         # AsyncClient тримає пул з'єднань, створюється один раз
         self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
 

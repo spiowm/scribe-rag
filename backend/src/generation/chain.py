@@ -1,12 +1,16 @@
 import asyncio
+import json
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 from google import genai
 from google.genai import types
 
+from src.config import settings
 from src.connectors.mongo import MongoConnector
-from src.generation import tools
+from src.generation import agy_protocol, tools
+from src.generation.agy_process import AgyError, AgyProcess
 from src.generation.prompts import (
     GLOSSARY,
     ORG_PRIMER,
@@ -17,6 +21,8 @@ from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
+
+NUM_ITERATIONS = 8  # складний шлях буває в 4 кроки — береться із запасом удвічі
 
 
 class RagChain:
@@ -69,6 +75,20 @@ class RagChain:
             ),
         )
 
+        # Для agy: інструменти текстом і схема відповіді — з тих самих декларацій.
+        self.provider = settings.LLM_PROVIDER
+        if self.provider == "agy":
+            agy_tools = [
+                t for t in self.config.tools or [] if isinstance(t, types.Tool)
+            ]
+            self.agy_tools_doc = agy_protocol.render_tools_doc(agy_tools)
+            schema_file = Path(settings.AGY_HOME) / "scribe-schema.json"
+            schema_file.write_text(
+                json.dumps(agy_protocol.build_schema(agy_tools), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            self.agy_schema_path = str(schema_file)
+
     def _system_instruction(self, member: dict | None = None) -> str:
         """Системний промпт із поточною датою і профілем співрозмовника."""
         today = datetime.now(UTC).strftime("%d.%m.%Y")
@@ -110,10 +130,65 @@ class RagChain:
         logger.warning("невідомий інструмент: %r", fc.name)
         return {"error": f"невідомий інструмент: {fc.name}"}
 
+    async def _reply_via_agy(
+        self, message: str, history: list[Message], member: dict | None
+    ) -> str:
+        """Той самий цикл з інструментами, але крок моделі — через процес agy."""
+        proc = AgyProcess(
+            bin_path=settings.AGY_BIN,
+            home=settings.AGY_HOME,
+            workdir=settings.AGY_WORKDIR,
+            model=settings.AGY_MODEL,
+            schema_path=self.agy_schema_path,
+            turn_timeout=settings.AGY_TURN_TIMEOUT,
+        )
+        try:
+            await proc.start()
+            text = agy_protocol.first_message(
+                self._system_instruction(member),
+                self.agy_tools_doc,
+                [(m.role, m.content) for m in history],
+                message,
+            )
+            for step_no in range(1, NUM_ITERATIONS + 1):
+                step = agy_protocol.parse_step(await proc.send(text))
+                if step.empty:
+                    raise AgyError("модель повернула порожній хід")
+                if not step.calls and not step.errors:
+                    logger.info("agy: %d ходів", step_no)
+                    return step.answer
+                results = await asyncio.gather(
+                    *(
+                        self._dispatch(types.FunctionCall(name=name, args=args))
+                        for name, args in step.calls
+                    )
+                )
+                pairs = [(name, r) for (name, _), r in zip(step.calls, results)]
+                text = agy_protocol.tool_results_message(
+                    pairs + step.errors, final=step_no == NUM_ITERATIONS
+                )
+            logger.warning(
+                "agy: вичерпано %d ітерацій, відповідаю зібраним", NUM_ITERATIONS
+            )
+            final = agy_protocol.parse_step(await proc.send(text))
+            if final.empty:
+                raise AgyError("модель повернула порожню фінальну відповідь")
+            return final.answer
+        finally:
+            await proc.close()
+
     async def generate_reply(
         self, message: str, history: list[Message], phone: str | None = None
     ) -> str:
         member = await self.mongo.find_member_by_phone(phone) if phone else None
+        if self.provider == "agy":
+            try:
+                return await self._reply_via_agy(message, history, member)
+            except AgyError as exc:
+                # Запасний шлях — той самий цикл через API, поточна поведінка.
+                logger.warning(
+                    "agy не впорався (%s) — відповідаю через Gemini API", exc
+                )
 
         role_map = {"user": "user", "assistant": "model"}
 
@@ -134,11 +209,7 @@ class RagChain:
             )
         )
 
-        # Тулз стало чотири, і типовий складний шлях уже займає 4 ходи:
-        # search -> get_document part 1 -> part 2 -> query_members. На 4
-        # запас нульовий, і в аудиті це вже давало порожню відповідь.
-        num_iterations = 8
-        for step in range(1, num_iterations + 1):
+        for step in range(1, NUM_ITERATIONS + 1):
             response = await self.client.aio.models.generate_content(
                 model=self.model,
                 contents=contents,
@@ -179,7 +250,7 @@ class RagChain:
         # Ітерації вичерпані. Замість шаблонної відмови — останній виклик
         # без інструментів: модель мусить відповісти тим, що вже назбирала.
         logger.warning(
-            "agent: вичерпано %d ітерацій, відповідаю зібраним", num_iterations
+            "agent: вичерпано %d ітерацій, відповідаю зібраним", NUM_ITERATIONS
         )
         response = await self.client.aio.models.generate_content(
             model=self.model,

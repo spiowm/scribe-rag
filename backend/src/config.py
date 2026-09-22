@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_LLM_MODEL: str = "gemini-3.7-flash"
 
+    # Модель через підписку agy замість платного API. "gemini" — як було.
+    LLM_PROVIDER: str = "agy"
+    AGY_BIN: str = "agy"
+    AGY_HOME: str = str(Path.home() / ".agy-bot")
+    AGY_WORKDIR: str = str(Path.home() / ".agy-bot-ws")
+    AGY_MODEL: str = "gemini-3.7-flash-low"
+    AGY_TURN_TIMEOUT: float = 120
+
     MONGO_URI: str = Field()
     MONGO_DB: str = "infobook"
     MONGO_USERS_COLLECTION: str = "users"
