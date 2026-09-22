@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import json
 import logging
 from datetime import UTC, datetime
@@ -23,6 +24,24 @@ from src.vectorstore.qdrant import QdrantRepository
 logger = logging.getLogger(__name__)
 
 NUM_ITERATIONS = 8  # складний шлях буває в 4 кроки — береться із запасом удвічі
+
+
+# Чим відповіли на цей запит — для інформаційного рядка під повідомленням.
+# Контекстна змінна, а не поле класу: RagChain один на застосунок, і два
+# одночасні запити перемішали б дані.
+LAST_RUN: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "last_run", default=None
+)
+
+
+def current_run() -> dict:
+    """Запис про поточний запит. Поза запитом створюємо власний, щоб не писати
+    у спільний словник за замовчуванням."""
+    run = LAST_RUN.get()
+    if run is None:
+        run = {}
+        LAST_RUN.set(run)
+    return run
 
 
 class RagChain:
@@ -106,6 +125,7 @@ class RagChain:
         )
 
     async def _dispatch(self, fc) -> dict:
+        current_run().setdefault("tools", []).append(fc.name)
         if fc.name == "search_knowledge_base":
             args = fc.args or {}
             return await tools.run_search(
@@ -151,6 +171,7 @@ class RagChain:
                 message,
             )
             for step_no in range(1, NUM_ITERATIONS + 1):
+                current_run()["steps"] = step_no
                 step = agy_protocol.parse_step(await proc.send(text))
                 if step.empty:
                     raise AgyError("модель повернула порожній хід")
@@ -181,11 +202,28 @@ class RagChain:
         self, message: str, history: list[Message], phone: str | None = None
     ) -> str:
         member = await self.mongo.find_member_by_phone(phone) if phone else None
+
+        run = {
+            "provider": "gemini",
+            "model": self.model,
+            "steps": 0,
+            "tools": [],
+            "fallback": False,
+        }
+        LAST_RUN.set(run)
+
         if self.provider == "agy":
+            run.update(provider="agy", model=settings.AGY_MODEL)
             try:
                 return await self._reply_via_agy(message, history, member)
             except AgyError as exc:
-                # Запасний шлях — той самий цикл через API, поточна поведінка.
+                run.update(
+                    provider="gemini",
+                    model=self.model,
+                    fallback=True,
+                    steps=0,
+                    tools=[],
+                )
                 logger.warning(
                     "agy не впорався (%s) — відповідаю через Gemini API", exc
                 )
@@ -210,6 +248,7 @@ class RagChain:
         )
 
         for step in range(1, NUM_ITERATIONS + 1):
+            current_run()["steps"] = step
             response = await self.client.aio.models.generate_content(
                 model=self.model,
                 contents=contents,
