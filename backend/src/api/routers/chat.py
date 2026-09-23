@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,27 @@ router = APIRouter(
     prefix="/chat",
     tags=["Chat"],
 )
+
+# Один запит на юзера за раз. Без цього два повідомлення, надіслані поспіль,
+# читають однакову історію й пишуть пари впереміш: заміряно, що відповідь на
+# довге питання лягає в БД після відповіді на коротке, і наступного разу модель
+# читає їх як відповіді не на ті питання.
+BUSY: dict[int, float] = {}
+# Страховка від зависання: якщо запит упав так, що finally не спрацював,
+# юзер не мусить лишитись заблокованим назавжди.
+BUSY_TTL = 300.0
+
+
+def take_slot(user_id: int) -> None:
+    """Займає єдиний слот юзера або відмовляє 429."""
+    started = BUSY.get(user_id)
+    if started is not None and time.monotonic() - started < BUSY_TTL:
+        raise HTTPException(429, "busy")
+    BUSY[user_id] = time.monotonic()
+
+
+def free_slot(user_id: int) -> None:
+    BUSY.pop(user_id, None)
 
 
 def build_footer(run: dict, seconds: float, history: int) -> str:
@@ -56,6 +77,7 @@ async def process_message_stream(
     user: User = Depends(get_user),
 ):
     """Те саме, що /chat/, але статуси йдуть одразу, а відповідь — у кінці."""
+    take_slot(user.id)
     session = await chats.get_or_create_session(db, user.id)
     history = await chats.get_recent_messages(db, session.id, limit=10)
 
@@ -105,6 +127,8 @@ async def process_message_stream(
         except Exception as exc:  # noqa: BLE001
             task.cancel()
             yield json.dumps({"type": "error", "text": str(exc)}) + "\n"
+        finally:
+            free_slot(user.id)
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -116,17 +140,23 @@ async def process_message(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_user),
 ):
-    session = await chats.get_or_create_session(db, user.id)
-    history = await chats.get_recent_messages(db, session.id, limit=10)
+    take_slot(user.id)
+    try:
+        session = await chats.get_or_create_session(db, user.id)
+        history = await chats.get_recent_messages(db, session.id, limit=10)
 
-    started = time.monotonic()
-    reply = await chain.generate_reply(request.message, history, user.phone_number)
-    seconds = time.monotonic() - started
+        started = time.monotonic()
+        reply = await chain.generate_reply(request.message, history, user.phone_number)
+        seconds = time.monotonic() - started
 
-    await chats.add_message(db, session.id, "user", request.message)
-    await chats.add_message(db, session.id, "assistant", reply)
+        await chats.add_message(db, session.id, "user", request.message)
+        await chats.add_message(db, session.id, "assistant", reply)
 
-    run = LAST_RUN.get() or {}
-    return ChatResponse(
-        reply=build_tools_block(run) + reply + build_footer(run, seconds, len(history))
-    )
+        run = LAST_RUN.get() or {}
+        return ChatResponse(
+            reply=build_tools_block(run)
+            + reply
+            + build_footer(run, seconds, len(history))
+        )
+    finally:
+        free_slot(user.id)

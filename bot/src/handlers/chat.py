@@ -9,6 +9,7 @@ from aiogram.utils.chat_action import ChatActionSender
 
 from src.api_client import ApiClient
 
+
 logger = logging.getLogger(__name__)
 
 router = Router()
@@ -56,7 +57,12 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
                     )
                     return
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 403:
+            if exc.response.status_code == 429:
+                # Ще пишемо попередню відповідь. Реакція замість тексту, щоб
+                # десяток надісланих поспіль повідомлень не дав десяток реплаїв.
+                await message.react([types.ReactionTypeEmoji(emoji="💅")])
+                return
+            elif exc.response.status_code == 403:
                 await message.reply("Спершу підтверди членство — натисни /start")
                 return
             await message.reply(
