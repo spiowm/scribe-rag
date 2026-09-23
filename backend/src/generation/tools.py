@@ -1,6 +1,9 @@
 import logging
 import re
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from google.genai import types
 
@@ -445,3 +448,77 @@ async def run_query_members(mongo: MongoConnector, **kwargs) -> dict:
         )
         for k, v in result.items()
     }
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """Усе про один інструмент в одному місці.
+
+    Раніше це знання було розкидане: декларація тут, маршрутизація й назва для
+    людини в chain.py, емодзі в роутері. Додати інструмент означало чотири
+    правки в трьох файлах — і одну з них ми справді забули, отримавши дубль
+    декларації, на якому впав API.
+    """
+
+    declaration: types.Tool
+    run: Callable[[Any, dict], Awaitable[dict]]  # (ланцюг, аргументи) -> результат
+    label: str  # як дія зветься для людини: «Пошук в базі»
+    icon: str  # для згорнутого блока в повідомленні
+    arg: str | None = None  # який аргумент показати поруч із назвою
+
+
+def _by_name(*specs: ToolSpec) -> dict[str, ToolSpec]:
+    """Ключ беремо з декларації, щоб реєстр не розійшовся з тим, що бачить модель."""
+    registry: dict[str, ToolSpec] = {}
+    for spec in specs:
+        for decl in spec.declaration.function_declarations or []:
+            if decl.name:
+                registry[decl.name] = spec
+    return registry
+
+
+TOOLS = _by_name(
+    ToolSpec(
+        declaration=SEARCH_TOOL,
+        run=lambda chain, args: run_search(
+            chain.qdrant, args.get("query", ""), args.get("terms")
+        ),
+        label="Пошук в базі",
+        icon="🔎",
+        arg="query",
+    ),
+    ToolSpec(
+        declaration=FIND_PERSON_TOOL,
+        run=lambda chain, args: run_find_person(chain.mongo, args.get("name", "")),
+        label="Перегляд профілю",
+        icon="👤",
+        arg="name",
+    ),
+    ToolSpec(
+        declaration=FIND_BY_POSITION_TOOL,
+        run=lambda chain, args: run_find_by_position(
+            chain.mongo, args.get("position", "")
+        ),
+        label="Пошук за посадою",
+        icon="🏷",
+        arg="position",
+    ),
+    ToolSpec(
+        declaration=GET_DOCUMENT_TOOL,
+        # документ читається з нашої БД, ланцюг тут не потрібен
+        run=lambda _chain, args: run_get_document(
+            args.get("source_id", ""), int(args.get("part") or 1)
+        ),
+        label="Читання документа",
+        icon="📄",
+    ),
+    ToolSpec(
+        declaration=QUERY_MEMBERS_TOOL,
+        run=lambda chain, args: run_query_members(chain.mongo, **args),
+        label="Підрахунок за довідником",
+        icon="📊",
+    ),
+)
+
+# Те, що йде в модель: порядок збережено, бо dict пам'ятає порядок вставки.
+DECLARATIONS = [spec.declaration for spec in TOOLS.values()]

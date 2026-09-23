@@ -17,19 +17,35 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
     async with ChatActionSender.typing(chat_id=message.chat.id, bot=bot):
         if message.from_user is None or message.text is None:
             return
-        try:
+
+        async def draft(text: str) -> None:
             await bot.send_rich_message_draft(
                 chat_id=message.chat.id,
                 draft_id=message.message_id,
                 rich_message=InputRichMessage(
-                    html="<tg-thinking>Думаю...</tg-thinking>"
+                    html=f"<tg-thinking>{text}</tg-thinking>"
                 ),
             )
 
-            reply = await api_client.chat(
+        reply = None
+        try:
+            await draft("Думаю...")
+            async for event in api_client.chat_stream(
                 message=message.text, telegram_id=message.from_user.id
-            )
-        except httpx.HTTPError:
+            ):
+                if event["type"] == "status":
+                    await draft(event["text"])
+                elif event["type"] == "reply":
+                    reply = event["text"]
+                elif event["type"] == "error":
+                    await message.reply(
+                        "Вибач, зараз не можу відповісти. Спробуй трохи пізніше."
+                    )
+                    return
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                await message.reply("Спершу підтверди членство — натисни /start")
+                return
             await message.reply(
                 "Вибач, зараз не можу відповісти. Спробуй трохи пізніше."
             )

@@ -1,3 +1,4 @@
+import json
 import logging
 
 import httpx
@@ -15,7 +16,10 @@ logger = logging.getLogger(__name__)
 class ApiClient:
     def __init__(self, base_url: str, timeout: float = 180.0):
         # AsyncClient тримає пул з'єднань, створюється один раз
-        self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=httpx.Timeout(10.0, read=timeout),
+        )
 
     async def link(
         self, telegram_id: int, telegram_username: str, phone: str
@@ -37,6 +41,15 @@ class ApiClient:
             "/chat/session/new", json={"telegram_id": telegram_id}
         )
         response.raise_for_status()
+
+    async def chat_stream(self, message: str, telegram_id: int):
+        """Віддає події одна за одною: статуси, потім відповідь."""
+        payload = {"telegram_id": telegram_id, "message": message}
+        async with self._client.stream("POST", "/chat/stream", json=payload) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if line.strip():
+                    yield json.loads(line)
 
     async def chat(self, message: str, telegram_id: int) -> str | None:
         request = ChatRequest(telegram_id=telegram_id, message=message)
