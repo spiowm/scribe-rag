@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import time
 
 import httpx
 from aiogram import Bot, Router, types
@@ -28,13 +30,24 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
             )
 
         reply = None
+        state = "Думаю…"
+        started = time.monotonic()
+
+        async def ticker() -> None:
+            """Цокає секунди в чернетці, поки ланцюг мовчить."""
+            while True:
+                await asyncio.sleep(2)
+                await draft(f"{state} · {int(time.monotonic() - started)} с")
+
+        tick = asyncio.create_task(ticker())
         try:
-            await draft("Думаю...")
+            await draft(state)
             async for event in api_client.chat_stream(
                 message=message.text, telegram_id=message.from_user.id
             ):
                 if event["type"] == "status":
-                    await draft(event["text"])
+                    state = event["text"]
+                    await draft(f"{state} · {int(time.monotonic() - started)} с")
                 elif event["type"] == "reply":
                     reply = event["text"]
                 elif event["type"] == "error":
@@ -50,6 +63,8 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
                 "Вибач, зараз не можу відповісти. Спробуй трохи пізніше."
             )
             return
+        finally:
+            tick.cancel()
 
     if not reply:
         await message.reply("Спершу підтверди членство — натисни /start")
