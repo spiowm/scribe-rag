@@ -3,6 +3,7 @@ import contextvars
 import json
 import logging
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,7 +26,6 @@ from src.vectorstore.qdrant import QdrantRepository
 logger = logging.getLogger(__name__)
 
 NUM_ITERATIONS = 8  # складний шлях буває в 4 кроки — береться із запасом удвічі
-
 
 # Чим відповіли на цей запит — для інформаційного рядка під повідомленням.
 # Контекстна змінна, а не поле класу: RagChain один на застосунок, і два
@@ -75,13 +75,7 @@ class RagChain:
         self.system_prompt = SYSTEM_PROMPT + ORG_PRIMER + GLOSSARY
 
         self.config = types.GenerateContentConfig(
-            tools=[
-                tools.SEARCH_TOOL,
-                tools.FIND_PERSON_TOOL,
-                tools.FIND_BY_POSITION_TOOL,
-                tools.GET_DOCUMENT_TOOL,
-                tools.QUERY_MEMBERS_TOOL,
-            ],
+            tools=[*tools.DECLARATIONS],
             system_instruction=self.system_prompt,
             temperature=0.2,
             thinking_config=types.ThinkingConfig(
@@ -113,13 +107,12 @@ class RagChain:
         # Для agy: інструменти текстом і схема відповіді — з тих самих декларацій.
         self.provider = settings.LLM_PROVIDER
         if self.provider == "agy":
-            agy_tools = [
-                t for t in self.config.tools or [] if isinstance(t, types.Tool)
-            ]
-            self.agy_tools_doc = agy_protocol.render_tools_doc(agy_tools)
+            self.agy_tools_doc = agy_protocol.render_tools_doc(tools.DECLARATIONS)
             schema_file = Path(settings.AGY_HOME) / "scribe-schema.json"
             schema_file.write_text(
-                json.dumps(agy_protocol.build_schema(agy_tools), ensure_ascii=False),
+                json.dumps(
+                    agy_protocol.build_schema(tools.DECLARATIONS), ensure_ascii=False
+                ),
                 encoding="utf-8",
             )
             self.agy_schema_path = str(schema_file)
@@ -141,30 +134,22 @@ class RagChain:
         )
 
     async def _dispatch(self, fc) -> dict:
-        current_run().setdefault("tools", []).append(fc.name)
-        if fc.name == "search_knowledge_base":
-            args = fc.args or {}
-            return await tools.run_search(
-                self.qdrant, args.get("query", ""), args.get("terms")
-            )
-        if fc.name == "find_person":
-            return await tools.run_find_person(
-                self.mongo, (fc.args or {}).get("name", "")
-            )
-        if fc.name == "get_document":
-            args = fc.args or {}
-            return await tools.run_get_document(
-                args.get("source_id", ""), int(args.get("part") or 1)
-            )
-        if fc.name == "query_members":
-            args = fc.args or {}
-            return await tools.run_query_members(self.mongo, **args)
-        if fc.name == "find_by_position":
-            return await tools.run_find_by_position(
-                self.mongo, (fc.args or {}).get("position", "")
-            )
-        logger.warning("невідомий інструмент: %r", fc.name)
-        return {"error": f"невідомий інструмент: {fc.name}"}
+        args = dict(fc.args or {})
+        run = current_run()
+        run.setdefault("tools", []).append(fc.name)
+
+        spec = tools.TOOLS.get(fc.name)
+        if spec is None:
+            logger.warning("невідомий інструмент: %r", fc.name)
+            return {"error": f"невідомий інструмент: {fc.name}"}
+
+        value = args.get(spec.arg) if spec.arg else None
+        text = f"{spec.label}: {value}" if value else spec.label
+        run.setdefault("calls", []).append((fc.name, text))
+        if emit := run.get("on_event"):
+            emit(f"{text}…")
+
+        return await spec.run(self, args)
 
     async def _reply_via_agy(
         self, message: str, history: list[Message], member: dict | None
@@ -233,7 +218,11 @@ class RagChain:
                 )
 
     async def generate_reply(
-        self, message: str, history: list[Message], phone: str | None = None
+        self,
+        message: str,
+        history: list[Message],
+        phone: str | None = None,
+        on_event: Callable[[str], None] | None = None,
     ) -> str:
         member = await self.mongo.find_member_by_phone(phone) if phone else None
 
@@ -243,9 +232,9 @@ class RagChain:
             "steps": 0,
             "tools": [],
             "fallback": False,
+            "on_event": on_event,
         }
         LAST_RUN.set(run)
-
         if self.provider == "agy":
             run.update(provider="agy", model=settings.AGY_MODEL)
             try:
@@ -257,6 +246,7 @@ class RagChain:
                     fallback=True,
                     steps=0,
                     tools=[],
+                    calls=[],
                 )
                 logger.warning(
                     "agy не впорався (%s) — відповідаю через Gemini API", exc
@@ -332,4 +322,5 @@ class RagChain:
                 update={"system_instruction": self._system_instruction(member)}
             ),
         )
+
         return response.text or "Вибач, не вдалось сформувати відповідь"
