@@ -314,6 +314,28 @@ async def run_search(
     return {"results": results}
 
 
+def _partial_match_note(name: str, people: list[dict]) -> str | None:
+    """Попереджає, коли слова запиту збіглися в різних людей.
+
+    `search_members` шукає за кожним словом окремо, тому на «Тарас Татарчинський»
+    повертає Олексія Татарчинського і чотирьох тезок Тарасів — а людини з таким
+    повним імʼям у довіднику немає. Модель приймала це за підтвердження, що Тарас
+    Татарчинський існує, і добудовувала спорідненість («його брат Тарас»).
+    """
+    asked = [w.lower() for w in re.findall(r"\w{3,}", name)]
+    if len(asked) < 2:
+        return None
+    for person in people:
+        full = f"{person.get('first_name', '')} {person.get('last_name', '')}".lower()
+        parts = full.split()
+        if all(any(part.startswith(word) for part in parts) for word in asked):
+            return None
+    return (
+        f"повного збігу за «{name}» немає — серед знайдених є тезки й однофамільці. "
+        "Не виводь зі спільного прізвища спорідненості."
+    )
+
+
 async def run_find_person(mongo: MongoConnector, name: str) -> dict:
     """Шукає людину в інфобуці"""
     try:
@@ -345,7 +367,10 @@ async def run_find_person(mongo: MongoConnector, name: str) -> dict:
     people = [serialize(docs[0])] + [
         serialize({k: v for k, v in d.items() if k in SHORT}) for d in docs[1:]
     ]
-    return {"people": people, "matched": len(docs)}
+    result = {"people": people, "matched": len(docs)}
+    if note := _partial_match_note(name, people):
+        result["note"] = note
+    return result
 
 
 CYRILLIC = re.compile(r"[а-яіїєґА-ЯІЇЄҐ]")
