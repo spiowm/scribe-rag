@@ -85,8 +85,8 @@ QUERY_MEMBERS_TOOL = types.Tool(
                 "Про набори: щоб сказати щось про людей одної хвилі — хто "
                 "там найстарший, хто ще активний, скільки їх — спершу візьми "
                 "**весь** набір через `joined_from`/`joined_to`. У `people` "
-                "приходять дати народження й вступу, тож порівнювати можна "
-                "вже по них.\n"
+                "приходять дати народження й вступу, а ще **поточні посади** — "
+                "єдине в базі, з чого видно, хто чим зараз зайнятий.\n"
                 "Про дітей особливо: у текстах списки «Діти:» є лише для частини "
                 "менторів, і часто **неповні** — тому число з пошуку буває меншим "
                 "за справжнє. Для «скільки в когось дітей» бери цю тулзу, не пошук.\n"
@@ -465,6 +465,30 @@ class ToolSpec:
     label: str  # як дія зветься для людини: «Пошук в базі»
     icon: str  # для згорнутого блока в повідомленні
     arg: str | None = None  # який аргумент показати поруч із назвою
+    # Коли одного аргумента мало (у query_members їх вісім), опис збирається так.
+    describe: Callable[[dict], str] | None = None
+
+
+def _members_label(args: dict) -> str:
+    """Людською: «фули», «активні, родина Кролики», «діти Барана», «по родинах»."""
+    statuses = {"Full": "фули", "Baby": "бейбі", "Observer": "обзервери",
+                "Alumni": "алюмні"}
+    groups = {"status": "по статусах", "state": "по активності",
+              "family": "по родинах", "mentor": "по менторах"}
+    parts = []
+    if args.get("status"):
+        parts.append(statuses.get(args["status"], args["status"]))
+    if args.get("state"):
+        parts.append("активні" if args["state"] == "Active" else "неактивні")
+    if args.get("family"):
+        parts.append(f"родина {args['family']}")
+    if args.get("mentor"):
+        parts.append(f"діти {args['mentor']}")
+    if args.get("joined_from") or args.get("joined_to"):
+        parts.append("набір")
+    if args.get("group_by"):
+        parts.append(groups.get(args["group_by"], args["group_by"]))
+    return ", ".join(parts)
 
 
 def _by_name(*specs: ToolSpec) -> dict[str, ToolSpec]:
@@ -515,8 +539,9 @@ TOOLS = _by_name(
     ToolSpec(
         declaration=QUERY_MEMBERS_TOOL,
         run=lambda chain, args: run_query_members(chain.mongo, **args),
-        label="Підрахунок за довідником",
+        label="Перегляд інфобука",
         icon="📊",
+        describe=_members_label,
     ),
 )
 

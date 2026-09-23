@@ -264,6 +264,7 @@ class MongoConnector:
                         "member_since": 1,
                         "birth_date": 1,
                         "mentor_name": 1,
+                        "current_positions": 1,
                     },
                 )
             ]

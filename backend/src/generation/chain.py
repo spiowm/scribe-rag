@@ -143,7 +143,11 @@ class RagChain:
             logger.warning("невідомий інструмент: %r", fc.name)
             return {"error": f"невідомий інструмент: {fc.name}"}
 
-        value = args.get(spec.arg) if spec.arg else None
+        value = (
+            spec.describe(args)
+            if spec.describe
+            else (args.get(spec.arg) if spec.arg else None)
+        )
         text = f"{spec.label}: {value}" if value else spec.label
         run.setdefault("calls", []).append((fc.name, text))
         if emit := run.get("on_event"):
