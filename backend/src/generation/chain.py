@@ -2,6 +2,7 @@ import asyncio
 import contextvars
 import json
 import logging
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -42,6 +43,21 @@ def current_run() -> dict:
         run = {}
         LAST_RUN.set(run)
     return run
+
+
+def _add_tokens(run: dict, result: dict) -> None:
+    """Складає токени ходу. `delta` — ціна саме цього кроку: лічильник usage
+    в agy накопичувальний на розмову, тож різницю рахує AgyProcess."""
+    delta = result.get("delta") or {}
+    tokens = run.setdefault("tokens", {"input": 0, "cache": 0, "output": 0})
+    tokens["input"] += delta.get("input_tokens", 0)
+    tokens["cache"] += delta.get("cache_read_tokens", 0)
+    tokens["output"] += delta.get("output_tokens", 0)
+
+
+# Один процес agy тримає ~240 МБ, тож п'ять одночасних — це вже 1.4 ГБ.
+# Семафор не пришвидшує відповіді, а не дає піку з'їсти машину: зайві повідомлення чекають своєї черги.
+AGY_SEMAPHORE = asyncio.Semaphore(settings.AGY_MAX_PROCS)
 
 
 class RagChain:
@@ -162,41 +178,59 @@ class RagChain:
             schema_path=self.agy_schema_path,
             turn_timeout=settings.AGY_TURN_TIMEOUT,
         )
-        try:
-            await proc.start()
-            text = agy_protocol.first_message(
-                self._system_instruction(member),
-                self.agy_tools_doc,
-                [(m.role, m.content) for m in history],
-                message,
-            )
-            for step_no in range(1, NUM_ITERATIONS + 1):
-                current_run()["steps"] = step_no
-                step = agy_protocol.parse_step(await proc.send(text))
-                if step.empty:
-                    raise AgyError("модель повернула порожній хід")
-                if not step.calls and not step.errors:
-                    logger.info("agy: %d ходів", step_no)
-                    return step.answer
-                results = await asyncio.gather(
-                    *(
-                        self._dispatch(types.FunctionCall(name=name, args=args))
-                        for name, args in step.calls
+        started = time.monotonic()
+        run = current_run()
+        async with AGY_SEMAPHORE:
+            try:
+                await proc.start()
+                text = agy_protocol.first_message(
+                    self._system_instruction(member),
+                    self.agy_tools_doc,
+                    [(m.role, m.content) for m in history],
+                    message,
+                )
+                for step_no in range(1, NUM_ITERATIONS + 1):
+                    current_run()["steps"] = step_no
+                    result = await proc.send(text)
+                    _add_tokens(run, result)
+                    step = agy_protocol.parse_step(result)
+                    if step.empty:
+                        raise AgyError("модель повернула порожній хід")
+                    if not step.calls and not step.errors:
+                        return step.answer
+                    results = await asyncio.gather(
+                        *(
+                            self._dispatch(types.FunctionCall(name=name, args=args))
+                            for name, args in step.calls
+                        )
                     )
+                    pairs = [(name, r) for (name, _), r in zip(step.calls, results)]
+                    text = agy_protocol.tool_results_message(
+                        pairs + step.errors, final=step_no == NUM_ITERATIONS
+                    )
+                logger.warning(
+                    "agy: вичерпано %d ітерацій, відповідаю зібраним", NUM_ITERATIONS
                 )
-                pairs = [(name, r) for (name, _), r in zip(step.calls, results)]
-                text = agy_protocol.tool_results_message(
-                    pairs + step.errors, final=step_no == NUM_ITERATIONS
+                result = await proc.send(text)
+                _add_tokens(run, result)
+                final = agy_protocol.parse_step(result)
+                if final.empty:
+                    raise AgyError("модель повернула порожню фінальну відповідь")
+                return final.answer
+            finally:
+                await proc.close()
+                tokens = run.get("tokens") or {}
+                logger.info(
+                    "agy %s: %.1f с, кроків %d, інструменти [%s], "
+                    "токени вхід %d кеш %d вихід %d",
+                    settings.AGY_MODEL,
+                    time.monotonic() - started,
+                    run.get("steps", 0),
+                    ", ".join(run.get("tools") or []),
+                    tokens.get("input", 0),
+                    tokens.get("cache", 0),
+                    tokens.get("output", 0),
                 )
-            logger.warning(
-                "agy: вичерпано %d ітерацій, відповідаю зібраним", NUM_ITERATIONS
-            )
-            final = agy_protocol.parse_step(await proc.send(text))
-            if final.empty:
-                raise AgyError("модель повернула порожню фінальну відповідь")
-            return final.answer
-        finally:
-            await proc.close()
 
     async def generate_reply(
         self, message: str, history: list[Message], phone: str | None = None

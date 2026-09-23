@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,7 @@ from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
 from src.db import engine
+from src.generation import agy_cleanup
 from src.generation.chain import RagChain
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -61,8 +63,20 @@ async def lifespan(app: FastAPI):
         mongo=app.state.mongo,
     )
 
+    cleanup_task = None
+    if settings.LLM_PROVIDER == "agy":
+        cleanup_task = asyncio.create_task(
+            agy_cleanup.cleanup_loop(
+                settings.AGY_HOME,
+                settings.AGY_STATE_TTL_DAYS,
+                settings.AGY_CLEANUP_HOURS,
+            )
+        )
+
     yield
 
+    if cleanup_task:
+        cleanup_task.cancel()
     await engine.dispose()
     await app.state.qdrant.qdrant_client.close()
     await app.state.mongo.close()

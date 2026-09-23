@@ -19,7 +19,7 @@ router = APIRouter(
 def build_footer(run: dict, seconds: float, history: int) -> str:
     """Service line under the reply: who answered, on what model, how long."""
     provider = "agy" if run.get("provider") == "agy" else "api"
-    line = f"{provider} {run.get('model', '?')} | {seconds:.0f}s | history {history}"
+    line = f"{provider} | {run.get('model', '?')} | {seconds:.0f}s | history {history}"
     return f"\n\n<sub>_{line}_</sub>"
 
 
