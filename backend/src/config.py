@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     AGY_WORKDIR: str = str(Path.home() / ".agy-bot-ws")
     AGY_MODEL: str = "gemini-3.7-flash-low"
     AGY_TURN_TIMEOUT: float = 120
+    AGY_MAX_PROCS: int = 10
+    AGY_STATE_TTL_DAYS: float = 3
+    AGY_CLEANUP_HOURS: float = 6
 
     MONGO_URI: str = Field()
     MONGO_DB: str = "infobook"
