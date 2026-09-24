@@ -24,13 +24,15 @@ class Settings(BaseSettings):
     NOTION_USERS_DB_ID: str = "3052e2ad-04c6-4950-8e1b-cb2f082d70f2"
 
     GOOGLE_DRIVE_CREDENTIALS_JSON: str = Field()
-    GOOGLE_DRIVE_FOLDER_IDS: str = Field()
+    GOOGLE_DRIVE_FOLDER_IDS: str = (
+        "18JB-5VzOo1MLUZpXADeT1EkRiX7X1-Sb,1n3CYo7A3nUm8bZngu39z9d3a1uful8KL"
+    )
 
     GEMINI_API_KEY: str = Field()
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_LLM_MODEL: str = "gemini-3.7-flash"
 
-    # Модель через підписку agy замість платного API. "gemini" — як було.
+    # Модель через підписку agy замість платного API. "gemini" — через API.
     LLM_PROVIDER: str = "agy"
     AGY_BIN: str = "agy"
     AGY_HOME: str = str(Path.home() / ".agy-bot")

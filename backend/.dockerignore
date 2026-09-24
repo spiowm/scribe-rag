@@ -1,0 +1,22 @@
+# Хостове віртуальне середовище: 310 МБ, і його симлінки ведуть на
+# /home/spiowm/..., якого в образі немає — воно ще й перекриває те,
+# що збудував uv sync.
+.venv
+
+# Секрети. COPY . . затягував .env з ключами Notion, Gemini, Mongo
+# та credentials Google Drive прямо в образ.
+.env
+.env.*
+!.env-example
+
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+.git/
+.gitignore
+tests/
+README.md
+dev.py

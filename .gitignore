@@ -11,3 +11,8 @@ wheels/
 .env
 
 .notes
+
+# Секрети для контейнерів: у репозиторій не потрапляють
+secrets/*
+!secrets/.gitkeep
+!secrets/README.md
