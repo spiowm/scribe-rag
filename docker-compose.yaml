@@ -7,15 +7,13 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB:-postgres}
     ports:
-      # Лише з самої машини: бекенд ходить у базу мережею compose, а назовні
-      # порт потрібен хіба для psql чи DBeaver з ноута. Без 127.0.0.1 постгрес
-      # слухає на всіх інтерфейсах.
-      - "127.0.0.1:5432:5432"
+      # Дефолт — loopback; на сервері BIND_ADDR звужує порт до Tailscale.
+      - "${BIND_ADDR:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432"
     shm_size: 128mb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # Без цього alembic у бекенді стартує раніше, ніж база готова.
+      # Інакше alembic стартує раніше, ніж база готова приймати зʼєднання.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
       interval: 3s
       timeout: 3s
@@ -25,10 +23,9 @@ services:
     image: qdrant/qdrant:v1.17
     restart: always
     ports:
-      # Те саме, і тут це важливіше: у qdrant за замовчуванням немає жодної
-      # авторизації — хто дістав порт, той читає й пише всю базу знань.
-      - "127.0.0.1:6333:6333"
-      - "127.0.0.1:6334:6334" # gRPC API
+      # У qdrant немає авторизації: відкритий порт — це відкрита база знань.
+      - "${BIND_ADDR:-127.0.0.1}:${QDRANT_HOST_PORT:-6333}:6333"
+      - "${BIND_ADDR:-127.0.0.1}:${QDRANT_GRPC_HOST_PORT:-6334}:6334"
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -47,7 +44,8 @@ services:
     volumes:
       - agy_home:/home/app
     ports:
-      - "8000:8000"
+      # На сервері 8000 зайнятий самим Coolify, тому номер теж змінною.
+      - "${BIND_ADDR:-127.0.0.1}:${BACKEND_HOST_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
