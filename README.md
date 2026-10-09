@@ -76,18 +76,70 @@ agy | gemini-3.7-flash-medium | 17s | history 10
 
 ### Logging in inside the container
 
-`agy` keeps its token in an OS keyring, so the container runs its own D-Bus + gnome-keyring
-(see `backend/docker/entrypoint.sh`). Log in once; the token lives in the `agy_home` volume
-and `agy` refreshes it on its own afterwards:
+`agy` keeps its token in an OS keyring, so the container runs its own D-Bus +
+gnome-keyring (see `backend/docker/entrypoint.sh`). The login is interactive, but needs no
+browser on the server: `agy` prints a URL and waits for the authorization code, with a
+60-second window — if it times out, just run the command again.
+
+The backend must be **stopped** first. Two keyring daemons on one volume fight over the
+same file, and `docker exec` into the running container does not work either: an exec
+session has no `DBUS_SESSION_BUS_ADDRESS`, and pointing it at the socket by hand answers
+`The connection is closed`.
+
+**Locally:**
 
 ```bash
 docker-compose stop backend
-docker-compose run --rm --no-deps backend agy    # prints a URL, paste the code back
+docker-compose run --rm --no-deps backend agy
 docker-compose start backend
 ```
 
-Stopping the backend first matters: two keyring daemons on one volume is asking for trouble.
-Over SSH `agy` uses a paste-the-code flow, so no browser is needed on the server.
+**On a Coolify server** the compose project belongs to Coolify and `/artifacts/<uuid>` is
+removed after the build, so use `docker` directly. Note `-a`, which also lists stopped
+containers:
+
+```bash
+BE=$(sudo docker ps -a --format '{{.Names}}' | grep '^backend-')
+IMG=$(sudo docker inspect "$BE" --format '{{.Config.Image}}')
+VOL=$(sudo docker inspect "$BE" --format '{{range .Mounts}}{{.Name}} {{end}}' \
+      | tr ' ' '\n' | grep agy-home)
+
+sudo docker stop "$BE"
+sudo docker run --rm -it -e TERM=xterm-256color -v "$VOL:/home/app" "$IMG" agy
+sudo docker start "$BE"
+```
+
+`-it` is required — without a TTY `agy` dies with `error opening TTY`. `TERM` matters too:
+a terminal type the server does not know (e.g. `xterm-ghostty`) leaves the TUI unable to
+draw itself.
+
+Do not set `KEYRING_PW` unless you have a reason to. Left empty, the entrypoint generates
+one on first start and keeps it in the volume, so the one-off login container picks up the
+same password. If you do set it in the panel, the login container needs the same value
+passed with `-e KEYRING_PW=...`, or it cannot unlock the keyring the backend created.
+
+### When a re-login is needed
+
+**Not on a schedule.** The stored token holds an `access_token` that expires in about an
+hour and a `refresh_token` with no recorded lifetime; `agy` refreshes the first one by
+itself and writes it back to the keyring. A Google refresh token for a published app has
+no fixed expiry — it dies when revoked, when the account password changes, or after months
+of disuse, which a running bot never reaches.
+
+**Redeploys do not break it.** The image is rebuilt and the containers are recreated, but
+the named volume holding the keyring stays. The login survives restarts and server reboots
+too.
+
+So re-login when it actually breaks, not preventively. The symptom is the footer under
+each reply switching from `agy` to `api` — that is the Gemini API fallback doing its job.
+Confirm in the log and repeat the login above:
+
+```bash
+sudo docker logs --tail 50 "$BE" 2>&1 | grep -i agy
+```
+
+What you lose until then is only money, not service: answers keep coming through the paid
+API.
 
 ## Indexing
 
