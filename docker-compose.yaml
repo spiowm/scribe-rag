@@ -35,27 +35,17 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    env_file:
-      # Необовʼязковий: локально звідси беруться ключі, а в Coolify цього файлу
-      # в клоні немає (.env у .gitignore) — там змінні задаються в панелі.
-      # Без required:false compose падає з "env file not found".
-      - path: ./backend/.env
-        required: false
     environment:
-      # Перебиває localhost із .env: у compose сусіди звуться іменами сервісів.
       POSTGRES_HOST: postgres
       QDRANT_HOST: qdrant
-      # Береться звідти ж, звідки створюється база, щоб не тримати той самий
-      # пароль у двох файлах і не ловити розходження.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задай POSTGRES_PASSWORD у .env поряд з compose}
-      # Не заданий — ентрипойнт згенерує один раз і збереже в томі.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      NOTION_TOKEN: ${NOTION_TOKEN:?}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?}
+      MONGO_URI: ${MONGO_URI:?}
+      GOOGLE_DRIVE_CREDENTIALS_JSON: ${GOOGLE_DRIVE_CREDENTIALS_JSON:?}
       KEYRING_PW: ${KEYRING_PW:-}
     volumes:
-      # Стан agy і кіраїнг із токеном підписки. Живе між перезапусками,
-      # тому секрет нижче потрібен лише при першому старті.
       - agy_home:/home/app
-      # Тека, а не файл: якщо монтувати відсутній файл, створюється каталог.
-      - ./secrets:/run/secrets:ro,z
     ports:
       - "8000:8000"
     depends_on:
@@ -67,11 +57,9 @@ services:
   bot:
     build: ./bot
     restart: unless-stopped
-    env_file:
-      - path: ./bot/.env
-        required: false
     environment:
       BACKEND_URL: http://backend:8000
+      BOT_TOKEN: ${BOT_TOKEN:?}
     depends_on:
       backend:
         condition: service_started
