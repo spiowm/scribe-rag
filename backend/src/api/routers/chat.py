@@ -40,10 +40,15 @@ def free_slot(user_id: int) -> None:
     BUSY.pop(user_id, None)
 
 
-def build_footer(run: dict, seconds: float, history: int) -> str:
-    """Service line under the reply: who answered, on what model, how long."""
+def build_footer(run: dict, seconds: float, window: chats.Window) -> str:
+    """Службовий рядок: хто відповів, якою моделлю, скільки часу, що в памʼяті."""
     provider = "agy" if run.get("provider") == "agy" else "api"
-    line = f"{provider} | {run.get('model', '?')} | {seconds:.0f}s | history {history}"
+    cut = "…" if window.truncated else ""
+    mem = (
+        f"{cut}{len(window.messages)} history · "
+        f"{window.tokens / 1000:.1f}k/{chats.HISTORY_TOKEN_BUDGET // 1000}k"
+    )
+    line = f"{provider} | {run.get('model', '?')} | {seconds:.0f}s | {mem}"
     return f"\n\n<sub>_{line}_</sub>"
 
 
@@ -79,14 +84,17 @@ async def process_message_stream(
     """Те саме, що /chat/, але статуси йдуть одразу, а відповідь — у кінці."""
     take_slot(user.id)
     session = await chats.get_or_create_session(db, user.id)
-    history = await chats.get_recent_messages(db, session.id, limit=10)
+    window = await chats.get_history_window(db, session.id)
 
     events: asyncio.Queue[str] = asyncio.Queue()
     started = time.monotonic()
 
     async def run() -> tuple[str, dict]:
         reply = await chain.generate_reply(
-            request.message, history, user.phone_number, on_event=events.put_nowait
+            request.message,
+            window.messages,
+            user.phone_number,
+            on_event=events.put_nowait,
         )
         return reply, LAST_RUN.get() or {}
 
@@ -118,7 +126,7 @@ async def process_message_stream(
                             "type": "reply",
                             "text": build_tools_block(info)
                             + reply
-                            + build_footer(info, seconds, len(history)),
+                            + build_footer(info, seconds, window),
                         }
                     )
                     + "\n"
@@ -143,10 +151,12 @@ async def process_message(
     take_slot(user.id)
     try:
         session = await chats.get_or_create_session(db, user.id)
-        history = await chats.get_recent_messages(db, session.id, limit=10)
+        window = await chats.get_history_window(db, session.id)
 
         started = time.monotonic()
-        reply = await chain.generate_reply(request.message, history, user.phone_number)
+        reply = await chain.generate_reply(
+            request.message, window.messages, user.phone_number
+        )
         seconds = time.monotonic() - started
 
         await chats.add_message(db, session.id, "user", request.message)
@@ -154,9 +164,7 @@ async def process_message(
 
         run = LAST_RUN.get() or {}
         return ChatResponse(
-            reply=build_tools_block(run)
-            + reply
-            + build_footer(run, seconds, len(history))
+            reply=build_tools_block(run) + reply + build_footer(run, seconds, window)
         )
     finally:
         free_slot(user.id)
