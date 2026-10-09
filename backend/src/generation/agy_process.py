@@ -81,15 +81,20 @@ class AgyProcess:
         if conversation_id:
             args += ["--conversation", conversation_id]
 
-        self.proc = await asyncio.create_subprocess_exec(
-            *args,
-            cwd=self.workdir,
-            env=self._env(),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            limit=16 * 1024 * 1024,
-        )
+        try:
+            self.proc = await asyncio.create_subprocess_exec(
+                *args,
+                cwd=self.workdir,
+                env=self._env(),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=16 * 1024 * 1024,
+            )
+        except OSError as exc:
+            # Нема бінарника або теки під cwd. Без обгортки це не AgyError,
+            # тому не повторюється і не видно серед інших збоїв agy.
+            raise AgyError(f"не вдалося запустити agy: {exc}") from exc
         self.last_usage = dict(last_usage or {})
         self.started_at = time.monotonic()
 

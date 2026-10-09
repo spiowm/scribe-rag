@@ -241,20 +241,29 @@ class RagChain:
         LAST_RUN.set(run)
         if self.provider == "agy":
             run.update(provider="agy", model=settings.AGY_MODEL)
-            try:
-                return await self._reply_via_agy(message, history, member)
-            except AgyError as exc:
-                run.update(
-                    provider="gemini",
-                    model=self.model,
-                    fallback=True,
-                    steps=0,
-                    tools=[],
-                    calls=[],
-                )
-                logger.warning(
-                    "agy не впорався (%s) — відповідаю через Gemini API", exc
-                )
+            for attempt in range(1, settings.AGY_ATTEMPTS + 1):
+                try:
+                    return await self._reply_via_agy(message, history, member)
+                except AgyError as exc:
+                    logger.warning(
+                        "agy не впорався (спроба %d з %d): %s",
+                        attempt,
+                        settings.AGY_ATTEMPTS,
+                        exc,
+                    )
+                    if (
+                        attempt == settings.AGY_ATTEMPTS
+                        and not settings.AGY_FALLBACK_TO_API
+                    ):
+                        raise
+            run.update(
+                provider="gemini",
+                model=self.model,
+                fallback=True,
+                steps=0,
+                tools=[],
+                calls=[],
+            )
 
         role_map = {"user": "user", "assistant": "model"}
 

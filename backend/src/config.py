@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     AGY_MAX_PROCS: int = 10
     AGY_STATE_TTL_DAYS: float = 3
     AGY_CLEANUP_HOURS: float = 6
+    AGY_FALLBACK_TO_API: bool = False
+    AGY_ATTEMPTS: int = 2
 
     MONGO_URI: str = Field()
     MONGO_DB: str = "infobook"
