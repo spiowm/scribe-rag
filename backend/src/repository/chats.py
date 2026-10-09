@@ -3,6 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.chat_session import ChatSession
 from src.models.message import Message
+from typing import NamedTuple
+
+CHARS_PER_TOKEN = 2.6
+HISTORY_TOKEN_BUDGET = 8000
 
 
 async def create_session(db: AsyncSession, user_id: int) -> ChatSession:
@@ -43,14 +47,46 @@ async def add_message(
     return message
 
 
-async def get_recent_messages(
-    db: AsyncSession, session_id: int, limit: int = 20
-) -> list[Message]:
+class Window(NamedTuple):
+    messages: list[Message]
+    tokens: int
+    truncated: bool
+
+
+def estimate_tokens(text: str) -> int:
+    return round(len(text) / CHARS_PER_TOKEN)
+
+
+async def get_history_window(
+    db: AsyncSession, session_id: int, budget: int = HISTORY_TOKEN_BUDGET
+) -> Window:
+    """Останні повідомлення, що вкладаються в бюджет токенів.
+
+    Ріже лише по межах повідомлень. Найновіше лишає завжди, навіть якщо воно
+    саме більше за бюджет: інакше модель отримає розмову зовсім без контексту.
+    """
     result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
         .order_by(Message.created_at.desc())
-        .limit(limit)
+        .limit(200)  # 200 повідомлень важать більше за будь-який бюджет
     )
-    messages = result.scalars().all()
-    return list(reversed(messages))
+    kept: list[Message] = []
+    used = 0
+    truncated = False
+    for message in result.scalars():
+        cost = estimate_tokens(message.content)
+        if kept and used + cost > budget:
+            truncated = True
+            break
+        kept.append(message)
+        used += cost
+
+    # Вікно має починатися з питання: відповідь без свого питання читається
+    # як сказана невідомо на що.
+    while len(kept) > 1 and kept[-1].role == "assistant":
+        used -= estimate_tokens(kept[-1].content)
+        kept.pop()
+        truncated = True
+
+    return Window(list(reversed(kept)), used, truncated)
