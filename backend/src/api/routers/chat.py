@@ -45,7 +45,7 @@ def build_footer(run: dict, seconds: float, window: chats.Window) -> str:
     provider = "agy" if run.get("provider") == "agy" else "api"
     cut = "…" if window.truncated else ""
     mem = (
-        f"{cut}{len(window.messages)} history · "
+        f"{cut}{len(window.messages)} messages · "
         f"{window.tokens / 1000:.1f}k/{chats.HISTORY_TOKEN_BUDGET // 1000}k"
     )
     line = f"{provider} | {run.get('model', '?')} | {seconds:.0f}s | {mem}"
