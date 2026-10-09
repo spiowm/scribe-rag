@@ -1,7 +1,8 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # dbus + gnome-keyring — Secret Service, з якого agy бере токен підписки;
 # libsecret-tools дає secret-tool для пересадки; util-linux — setpriv.
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
         dbus dbus-x11 gnome-keyring libsecret-tools util-linux \
         curl ca-certificates \
