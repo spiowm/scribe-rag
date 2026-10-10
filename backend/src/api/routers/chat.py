@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db, get_memes, get_rag_chain, get_user
-from src.api.schemas import ChatRequest, ChatResponse
+from src.api.schemas import ChatRequest, ChatResponse, RateRequest
 from src.generation.chain import LAST_RUN, RagChain
 from src.generation.tools import TOOLS
 from src.models.user import User
@@ -67,6 +67,17 @@ def build_tools_block(run: dict) -> str:
     )
 
 
+@router.post("/rate", status_code=204)
+async def rate_message(
+    request: RateRequest,
+    user: User = Depends(get_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Лайк або дизлайк на відповідь бота."""
+    if not await chats.set_rating(db, request.message_id, user.id, request.value):
+        raise HTTPException(404, "message_not_found")
+
+
 @router.post("/session/new", status_code=204)
 async def new_session(
     user: User = Depends(get_user),
@@ -124,11 +135,13 @@ async def process_message_stream(
                 reply, info = task.result()
                 seconds = time.monotonic() - started
                 await chats.add_message(db, session.id, "user", request.message)
-                await chats.add_message(db, session.id, "assistant", reply)
+                answer = await chats.add_message(db, session.id, "assistant", reply)
                 yield (
                     json.dumps(
                         {
                             "type": "reply",
+                            # id потрібен боту, щоб кнопки оцінки знали, що оцінюють
+                            "message_id": answer.id,
                             "text": build_tools_block(info)
                             + reply
                             + build_footer(info, seconds, window),

@@ -5,6 +5,7 @@ from google import genai
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 
+from src.config import settings
 from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.connectors.notion import NotionConnector
@@ -57,4 +58,15 @@ async def get_user(request: Request, db: AsyncSession = Depends(get_db)) -> User
     user = await users.get_user_by_telegram_id(db, telegram_id)
     if user is None:
         raise HTTPException(403, "not_linked")
+    return user
+
+
+async def get_admin(user: User = Depends(get_user)) -> User:
+    """Той самий юзер, але звірений із власником.
+
+    telegram_id приходить у тілі запиту, тобто від клієнта, — тому перевірка
+    саме тут, а не в боті: інакше адмінка відкрита будь-кому, хто знає порт.
+    """
+    if user.telegram_id != settings.ADMIN_TELEGRAM_ID:
+        raise HTTPException(403, "not_admin")
     return user

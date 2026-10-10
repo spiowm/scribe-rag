@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -15,6 +17,13 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class RateRequest(BaseModel):
+    telegram_id: int
+    message_id: int
+    # Literal, а не int: оцінка приходить із callback_data, тобто від клієнта.
+    value: Literal[1, -1]
 
 
 class LinkRequest(BaseModel):

@@ -130,6 +130,8 @@ class MemeRepository:
         )
         return {
             "url": presigned_get(f"memes/{chosen.id}.jpg", expires=URL_TTL),
-            "caption": payload.get("caption", ""),
+            # Підпис групи — для мемів з альбому: там текст належить першому
+            # повідомленню, а решта приходять порожні. Таких 48.
+            "caption": payload.get("caption") or payload.get("album_caption") or "",
             "link": payload.get("link", ""),
         }
