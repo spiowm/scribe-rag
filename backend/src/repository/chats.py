@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.chat_session import ChatSession
@@ -21,7 +21,7 @@ async def get_active_session(db: AsyncSession, user_id: int) -> ChatSession | No
     session = await db.execute(
         select(ChatSession)
         .where(ChatSession.user_id == user_id)
-        .order_by(ChatSession.created_at.desc())
+        .order_by(ChatSession.id.desc())
         .limit(1)
     )
     return session.scalar_one_or_none()
@@ -65,10 +65,15 @@ async def get_history_window(
     Ріже лише по межах повідомлень. Найновіше лишає завжди, навіть якщо воно
     саме більше за бюджет: інакше модель отримає розмову зовсім без контексту.
     """
+    # Порядок по id, а не по created_at: `func.now()` віддає час початку
+    # транзакції, а не моменту запису. Питання лягає в базу вже після
+    # генерації, але штамп у нього з моменту, коли запит прийшов, — у базі це
+    # видно як рівно тривалість генерації між питанням і відповіддю. Отже
+    # created_at тут не колонка порядку вставки, а id — завжди.
     result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
-        .order_by(Message.created_at.desc())
+        .order_by(Message.id.desc())
         .limit(200)  # 200 повідомлень важать більше за будь-який бюджет
     )
     kept: list[Message] = []
@@ -90,3 +95,28 @@ async def get_history_window(
         truncated = True
 
     return Window(list(reversed(kept)), used, truncated)
+
+
+async def set_rating(
+    db: AsyncSession, message_id: int, user_id: int, value: int
+) -> bool:
+    """Ставить оцінку відповіді. Вертає False, якщо такої відповіді в цього юзера немає.
+
+    Перевірка власника тут, а не в роутері, і вона частина самого UPDATE:
+    `message_id` приходить із callback_data, тобто від клієнта, і за ним можна
+    підсунути будь-яке число. Один запит замість «спершу прочитай, тоді онови»
+    ще й не має вікна між перевіркою й записом.
+    """
+    result = await db.execute(
+        update(Message)
+        .where(
+            Message.id == message_id,
+            Message.role == "assistant",
+            Message.session_id.in_(
+                select(ChatSession.id).where(ChatSession.user_id == user_id)
+            ),
+        )
+        .values(rating=value)
+    )
+    await db.commit()
+    return bool(result.rowcount)

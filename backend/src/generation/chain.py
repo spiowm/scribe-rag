@@ -77,7 +77,6 @@ class RagChain:
         self.config = types.GenerateContentConfig(
             tools=[*tools.DECLARATIONS],
             system_instruction=self.system_prompt,
-            temperature=0.2,
             thinking_config=types.ThinkingConfig(
                 thinking_level=types.ThinkingLevel.LOW
             ),
@@ -90,7 +89,6 @@ class RagChain:
         # коли цикл вичерпав ітерації й моделі треба відповісти зібраним.
         self.final_config = types.GenerateContentConfig(
             system_instruction=self.system_prompt,
-            temperature=0.2,
             thinking_config=types.ThinkingConfig(
                 thinking_level=types.ThinkingLevel.LOW
             ),
@@ -109,6 +107,8 @@ class RagChain:
         if self.provider == "agy":
             self.agy_tools_doc = agy_protocol.render_tools_doc(tools.DECLARATIONS)
             schema_file = Path(settings.AGY_HOME) / "scribe-schema.json"
+            # На чистій машині AGY_HOME ще не існує, і бекенд падав на старті.
+            schema_file.parent.mkdir(parents=True, exist_ok=True)
             schema_file.write_text(
                 json.dumps(
                     agy_protocol.build_schema(tools.DECLARATIONS), ensure_ascii=False

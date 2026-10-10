@@ -3,13 +3,17 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
+    # Телеграм-id власника: йому йдуть сповіщення про збої, і лише він має
+    # доступ до /admin. Не задано — адмінки й сповіщень просто немає.
+    ADMIN_TELEGRAM_ID: int | None = None
+
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "postgres"
@@ -54,6 +58,16 @@ class Settings(BaseSettings):
     MONGO_URI: str = Field()
     MONGO_DB: str = "infobook"
     MONGO_USERS_COLLECTION: str = "users"
+
+    @field_validator("ADMIN_TELEGRAM_ID", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        """Порожнє значення змінної — це «не задано», а не нуль.
+
+        У панелі Coolify і в compose незаданий ключ приходить порожнім рядком,
+        а pydantic на ньому падає — тобто бот не піднявся б узагалі.
+        """
+        return value or None
 
     @computed_field
     @property

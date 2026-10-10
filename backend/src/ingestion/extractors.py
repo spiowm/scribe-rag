@@ -86,7 +86,6 @@ async def gemini_text(
     resp = await client.aio.models.generate_content(
         model=model,
         contents=[types.Part.from_bytes(data=blob, mime_type=mime), EXTRACTION_PROMPT],
-        config=types.GenerateContentConfig(temperature=0.0),
     )
     candidate = resp.candidates[0] if resp.candidates else None
     if candidate is None or not resp.text:

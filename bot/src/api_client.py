@@ -42,6 +42,31 @@ class ApiClient:
         )
         response.raise_for_status()
 
+    async def rate(self, telegram_id: int, message_id: int, value: int) -> bool:
+        """Вертає False, якщо бекенд не знайшов такої відповіді в цього юзера."""
+        response = await self._client.post(
+            "/chat/rate",
+            json={
+                "telegram_id": telegram_id,
+                "message_id": message_id,
+                "value": value,
+            },
+        )
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        return True
+
+    async def stats(self, telegram_id: int) -> dict | None:
+        """Зведення для власника. None — бекенд не визнав цей id адміном."""
+        response = await self._client.post(
+            "/admin/stats", json={"telegram_id": telegram_id}
+        )
+        if response.status_code == 403:
+            return None
+        response.raise_for_status()
+        return response.json()
+
     async def chat_stream(self, message: str, telegram_id: int):
         """Віддає події одна за одною: статуси, потім відповідь."""
         payload = {"telegram_id": telegram_id, "message": message}

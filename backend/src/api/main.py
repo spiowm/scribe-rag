@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from google import genai
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 
-from src.api.routers import auth, chat, sync
+from src.api.routers import admin, auth, chat, sync
 from src.config import settings
 from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
@@ -101,6 +101,7 @@ app = FastAPI(
 app.include_router(sync.router)
 app.include_router(chat.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
