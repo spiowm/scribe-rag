@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
-from google import genai
 
 from fastapi import Depends, Request
+from google import genai
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 
@@ -12,6 +12,7 @@ from src.db import async_session_maker
 from src.generation.chain import RagChain
 from src.models.user import User
 from src.repository import users
+from src.vectorstore.memes import MemeRepository
 from src.vectorstore.qdrant import QdrantRepository
 
 
@@ -26,6 +27,10 @@ def get_notion_connector(request: Request) -> NotionConnector:
 
 def get_qdrant_repository(request: Request) -> QdrantRepository:
     return request.app.state.qdrant
+
+
+def get_memes(request: Request) -> MemeRepository:
+    return request.app.state.memes
 
 
 def get_rag_chain(request: Request) -> RagChain:

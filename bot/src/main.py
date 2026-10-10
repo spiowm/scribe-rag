@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
+
 from src.api_client import ApiClient
 from src.config import settings
 from src.handlers import chat, commands, onboarding

@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION_NAME: str = "general"
+    QDRANT_MEMES_COLLECTION: str = "memes"
+
+    R2_ACCOUNT_ID: str = Field()
+    R2_ACCESS_KEY_ID: str = Field()
+    R2_SECRET_ACCESS_KEY: str = Field()
+    R2_BUCKET: str = "scribe-rag"
 
     NOTION_TOKEN: str = Field()
     NOTION_USERS_DB_ID: str = "3052e2ad-04c6-4950-8e1b-cb2f082d70f2"
@@ -37,7 +43,7 @@ class Settings(BaseSettings):
     AGY_BIN: str = "agy"
     AGY_HOME: str = str(Path.home() / ".agy-bot")
     AGY_WORKDIR: str = str(Path.home() / ".agy-bot-ws")
-    AGY_MODEL: str = "gemini-3.7-flash-medium"
+    AGY_MODEL: str = "gemini-3.8-flash-low"
     AGY_TURN_TIMEOUT: float = 120
     AGY_MAX_PROCS: int = 10
     AGY_STATE_TTL_DAYS: float = 3
