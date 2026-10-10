@@ -6,12 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, get_rag_chain, get_user
+from src.api.dependencies import get_db, get_memes, get_rag_chain, get_user
 from src.api.schemas import ChatRequest, ChatResponse
 from src.generation.chain import LAST_RUN, RagChain
 from src.generation.tools import TOOLS
 from src.models.user import User
 from src.repository import chats
+from src.vectorstore.memes import MemeRepository
 
 router = APIRouter(
     prefix="/chat",
@@ -80,6 +81,7 @@ async def process_message_stream(
     chain: RagChain = Depends(get_rag_chain),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_user),
+    memes: MemeRepository = Depends(get_memes),
 ):
     """Те саме, що /chat/, але статуси йдуть одразу, а відповідь — у кінці."""
     take_slot(user.id)
@@ -100,6 +102,9 @@ async def process_message_stream(
 
     async def stream():
         task = asyncio.create_task(run())
+        meme = await memes.pick(request.message, user.id)
+        if meme:
+            yield json.dumps({"type": "meme", **meme}) + "\n"
         try:
             while True:
                 getter = asyncio.create_task(events.get())

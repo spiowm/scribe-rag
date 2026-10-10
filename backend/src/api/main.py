@@ -14,6 +14,7 @@ from src.connectors.notion import NotionConnector
 from src.db import engine
 from src.generation import agy_cleanup
 from src.generation.chain import RagChain
+from src.vectorstore.memes import MemeRepository
 from src.vectorstore.qdrant import QdrantRepository
 
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +43,13 @@ async def lifespan(app: FastAPI):
         embedding_model=embedding_model,
     )
     await app.state.qdrant.ensure_collection()
+
+    app.state.memes = MemeRepository(
+        client=app.state.qdrant.qdrant_client,
+        collection=settings.QDRANT_MEMES_COLLECTION,
+        embedding_model=embedding_model,
+    )
+    await app.state.memes.warm()
 
     app.state.mongo = MongoConnector(
         settings.MONGO_URI,
