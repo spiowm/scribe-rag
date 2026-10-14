@@ -22,7 +22,15 @@ async def list_tools(_ctx, _params) -> types.ListToolsResult:
                 else {"type": "object"}
             )
             tools.append(
-                types.Tool(name=name, description=decl.description, input_schema=schema)
+                types.Tool(
+                    name=name,
+                    title=spec.label,
+                    description=decl.description,
+                    input_schema=schema,
+                    # Інструменти лише читають. Gemini без цієї позначки
+                    # просить підтвердження на кожен виклик.
+                    annotations=types.ToolAnnotations(read_only_hint=True),
+                )
             )
     return types.ListToolsResult(tools=tools)
 
@@ -41,6 +49,11 @@ async def call_tool(ctx, params) -> types.CallToolResult:
 
 mcp = Server(
     "scribe-rag",
+    title="BEST Lviv",
+    description=(
+        "База знань і довідник членів BEST Lviv: процеси, документи, івенти, "
+        "люди, посади, статистика складу."
+    ),
     instructions=ORG_PRIMER + GLOSSARY,
     on_list_tools=list_tools,
     on_call_tool=call_tool,

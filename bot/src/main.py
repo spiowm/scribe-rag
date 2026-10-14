@@ -31,6 +31,7 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
     menu = [
         BotCommand(command="start", description="Старт"),
         BotCommand(command="new", description="Нова розмова"),
+        BotCommand(command="mcp_login", description="Код входу для MCP"),
     ]
     await bot.set_my_commands(menu, scope=BotCommandScopeAllPrivateChats())
     if settings.ADMIN_TELEGRAM_ID:

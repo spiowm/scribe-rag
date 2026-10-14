@@ -6,11 +6,15 @@ from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from mcp.server.auth.provider import AuthorizationCode, construct_redirect_uri
 
+from src.config import settings
 from src.db import async_session_maker
 from src.public.oauth import CODE_TTL, provider
 from src.repository import login_codes
 
 router = APIRouter()
+
+# Відкриває бота й одразу надсилає /start mcp_login — бот відповідає кодом.
+BOT_LINK = f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start=mcp_login"
 
 PAGE = """<!doctype html>
 <html lang="uk">
@@ -25,6 +29,9 @@ PAGE = """<!doctype html>
                    box-sizing: border-box; margin-top: .5rem; }}
   input {{ letter-spacing: .2em; text-transform: uppercase; }}
   .error {{ color: #b00020; }}
+  .button {{ display: block; text-align: center; padding: .6rem;
+             background: #229ed9; color: #fff; text-decoration: none;
+             border-radius: .4rem; }}
 </style>
 </head>
 <body>
@@ -33,8 +40,9 @@ PAGE = """<!doctype html>
 </body>
 </html>"""
 
-FORM = """<p>Надішли боту BEST Lviv у Telegram команду <b>/mcp_login</b>
-і встав сюди код, який він дасть.</p>
+FORM = """<p>Отримай код у Telegram-боті BEST Lviv і встав його сюди.</p>
+<p><a class="button" href="{bot_link}" target="_blank" rel="noopener">
+Відкрити бота й отримати код</a></p>
 {error}
 <form method="post">
   <input type="hidden" name="pending" value="{pending}">
@@ -48,7 +56,7 @@ EXPIRED = """<p class="error">Посилання для входу застар�
 
 def _form(pending: str, error: str = "") -> HTMLResponse:
     error_html = f'<p class="error">{escape(error)}</p>' if error else ""
-    body = FORM.format(pending=escape(pending), error=error_html)
+    body = FORM.format(pending=escape(pending), error=error_html, bot_link=BOT_LINK)
     return HTMLResponse(PAGE.format(body=body))
 
 

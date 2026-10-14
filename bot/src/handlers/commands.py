@@ -1,5 +1,5 @@
-from aiogram import Router, types
-from aiogram.filters import Command
+from aiogram import F, Router, types
+from aiogram.filters import Command, CommandStart
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 from src.api_client import ApiClient
@@ -12,6 +12,26 @@ kb = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True,
 )
+
+
+# Посилання зі сторінки входу: t.me/<бот>?start=mcp_login. Стоїть вище за
+# cmd_start, бо Command("start") теж зловив би /start mcp_login.
+@router.message(CommandStart(deep_link=True, magic=F.args == "mcp_login"))
+@router.message(Command("mcp_login"))
+async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
+    assert message.from_user
+    code = await api_client.login_code(message.from_user.id)
+    if code is None:
+        await message.reply(
+            "Спершу підтверди, що ти член BEST Lviv: поділись номером телефону.",
+            reply_markup=kb,
+        )
+        return
+    await message.reply(
+        f"Код для входу: <code>{code}</code>\n"
+        "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.",
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("start"))
@@ -30,19 +50,3 @@ async def cmd_new(message: types.Message, api_client: ApiClient):
     assert message.from_user
     await api_client.new_session(message.from_user.id)
     await message.reply("Нова розмова розпочата")
-
-
-@router.message(Command("mcp_login"))
-async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
-    assert message.from_user
-    code = await api_client.login_code(message.from_user.id)
-    if code is None:
-        await message.reply(
-            "Спершу підтверди, що ти член BEST Lviv: надішли /start і поділись номером."
-        )
-        return
-    await message.reply(
-        f"Код для входу: <code>{code}</code>\n"
-        "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.",
-        parse_mode="HTML",
-    )
