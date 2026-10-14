@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
@@ -9,6 +10,7 @@ from mcp.server.auth.settings import (
     ClientRegistrationOptions,
     RevocationOptions,
 )
+from mcp.server.transport_security import TransportSecuritySettings
 
 from src.config import settings
 from src.connectors.mongo import MongoConnector
@@ -19,6 +21,8 @@ from src.public.oauth import provider
 from src.vectorstore.qdrant import QdrantRepository
 
 logging.basicConfig(level=logging.INFO)
+PUBLIC_HOST = urlparse(settings.PUBLIC_URL).netloc
+
 
 mcp_app = mcp.streamable_http_app(
     streamable_http_path="/mcp",
@@ -33,6 +37,14 @@ mcp_app = mcp.streamable_http_app(
     ),
     auth_server_provider=provider,
     token_verifier=ProviderTokenVerifier(provider),
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=[PUBLIC_HOST, "127.0.0.1:*", "localhost:*"],
+        allowed_origins=[
+            settings.PUBLIC_URL,
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+        ],
+    ),
 )
 
 
