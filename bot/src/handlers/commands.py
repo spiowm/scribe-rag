@@ -3,6 +3,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 from src.api_client import ApiClient
+from src.config import settings
 
 router = Router()
 
@@ -29,7 +30,8 @@ async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
         return
     await message.reply(
         f"Код для входу: <code>{code}</code>\n"
-        "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.",
+        "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.\n\n"
+        f"Адреса MCP для підключення: <code>{settings.MCP_URL}</code>",
         parse_mode="HTML",
     )
 

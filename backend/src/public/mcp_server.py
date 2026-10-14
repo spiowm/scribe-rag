@@ -3,7 +3,7 @@ import json
 from mcp import types
 from mcp.server.lowlevel.server import Server
 
-from src.generation.prompts import GLOSSARY, ORG_PRIMER
+from src.generation.prompts import GLOSSARY, MCP_ANSWER_RULES, ORG_PRIMER
 from src.generation.tools import TOOLS, Limits
 
 # Клієнти MCP тримають результати в контексті всю розмову, а Claude Code
@@ -54,7 +54,7 @@ mcp = Server(
         "База знань і довідник членів BEST Lviv: процеси, документи, івенти, "
         "люди, посади, статистика складу."
     ),
-    instructions=ORG_PRIMER + GLOSSARY,
+    instructions=ORG_PRIMER + GLOSSARY + MCP_ANSWER_RULES,
     on_list_tools=list_tools,
     on_call_tool=call_tool,
 )
