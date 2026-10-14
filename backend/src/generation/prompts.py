@@ -928,9 +928,6 @@ def user_context(member: dict | None) -> str:
     rows = [f"- Імʼя: **{name}**"]
     if member.get("status"):
         rows.append(f"- Статус: {member['status']}")
-    if member.get("board"):
-        rows.append(f"- На борді: {member['board']}")
-    # Поточних посад мало (найбільше 7), тому вони йдуть повністю.
     current = member.get("current_positions") or []
     if current:
         rows.append(f"- Поточні посади (за інфобуком): {'; '.join(current)}")
