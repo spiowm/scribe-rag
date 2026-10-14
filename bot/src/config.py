@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     BACKEND_URL: str
     # Той самий id, що й у бекенда: кому писати про збої і хто бачить /admin.
     ADMIN_TELEGRAM_ID: int | None = None
+    # Адреса, яку людина вставляє в Gemini/Claude, — показується разом із кодом.
+    MCP_URL: str = "https://mcp.best-lviv.org.ua/mcp"
 
     @field_validator("ADMIN_TELEGRAM_ID", mode="before")
     @classmethod
