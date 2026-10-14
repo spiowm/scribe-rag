@@ -30,3 +30,19 @@ async def cmd_new(message: types.Message, api_client: ApiClient):
     assert message.from_user
     await api_client.new_session(message.from_user.id)
     await message.reply("Нова розмова розпочата")
+
+
+@router.message(Command("mcp_login"))
+async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
+    assert message.from_user
+    code = await api_client.login_code(message.from_user.id)
+    if code is None:
+        await message.reply(
+            "Спершу підтверди, що ти член BEST Lviv: надішли /start і поділись номером."
+        )
+        return
+    await message.reply(
+        f"Код для входу: <code>{code}</code>\n"
+        "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.",
+        parse_mode="HTML",
+    )

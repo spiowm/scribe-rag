@@ -29,8 +29,8 @@ async def list_tools(_ctx, _params) -> types.ListToolsResult:
 
 async def call_tool(ctx, params) -> types.CallToolResult:
     spec = TOOLS[params.name]
-    chain = ctx.request.app.state.rag_chain
-    result = await spec.run(chain, params.arguments or {}, LIMITS)
+    deps = ctx.request.app.state
+    result = await spec.run(deps, params.arguments or {}, LIMITS)
     return types.CallToolResult(
         content=[
             types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))
