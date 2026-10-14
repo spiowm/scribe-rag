@@ -86,5 +86,15 @@ class ApiClient:
 
         return data.reply
 
+    async def login_code(self, telegram_id: int) -> str | None:
+        """Код входу для MCP. None — людина ще не підтвердила номер."""
+        response = await self._client.post(
+            "/auth/login-code", json={"telegram_id": telegram_id}
+        )
+        if response.status_code == 403:
+            return None
+        response.raise_for_status()
+        return response.json()["code"]
+
     async def close(self) -> None:
         await self._client.aclose()

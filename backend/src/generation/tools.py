@@ -504,7 +504,8 @@ class ToolSpec:
     """
 
     declaration: types.Tool
-    # (ланцюг, аргументи, ліміти) -> результат
+    # (залежності, аргументи, ліміти) -> результат. Залежності — будь-що з
+    # .qdrant і .mongo: у бота це RagChain, у MCP — app.state.
     run: Callable[[Any, dict, Limits], Awaitable[dict]]
     label: str  # як дія зветься для людини: «Пошук в базі»
     icon: str  # для згорнутого блока в повідомленні
@@ -548,8 +549,8 @@ def _by_name(*specs: ToolSpec) -> dict[str, ToolSpec]:
 TOOLS = _by_name(
     ToolSpec(
         declaration=SEARCH_TOOL,
-        run=lambda chain, args, limits: run_search(
-            chain.qdrant, args.get("query", ""), args.get("terms"), limits.search
+        run=lambda deps, args, limits: run_search(
+            deps.qdrant, args.get("query", ""), args.get("terms"), limits.search
         ),
         label="Пошук в базі",
         icon="🔎",
@@ -557,8 +558,8 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=FIND_PERSON_TOOL,
-        run=lambda chain, args, _limits: run_find_person(
-            chain.mongo, args.get("name", "")
+        run=lambda deps, args, _limits: run_find_person(
+            deps.mongo, args.get("name", "")
         ),
         label="Перегляд профілю",
         icon="👤",
@@ -566,8 +567,8 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=FIND_BY_POSITION_TOOL,
-        run=lambda chain, args, _limits: run_find_by_position(
-            chain.mongo, args.get("position", "")
+        run=lambda deps, args, _limits: run_find_by_position(
+            deps.mongo, args.get("position", "")
         ),
         label="Пошук за посадою",
         icon="🏷",
@@ -575,8 +576,8 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=GET_DOCUMENT_TOOL,
-        # документ читається з нашої БД, ланцюг тут не потрібен
-        run=lambda _chain, args, limits: run_get_document(
+        # документ читається з Postgres, залежності тут не потрібні
+        run=lambda _deps, args, limits: run_get_document(
             args.get("source_id", ""),
             int(args.get("part") or 1),
             limits.document_part,
@@ -586,7 +587,7 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=QUERY_MEMBERS_TOOL,
-        run=lambda chain, args, _limits: run_query_members(chain.mongo, **args),
+        run=lambda deps, args, _limits: run_query_members(deps.mongo, **args),
         label="Перегляд інфобука",
         icon="📊",
         describe=_members_label,

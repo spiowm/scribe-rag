@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Телеграм-id власника: йому йдуть сповіщення про збої, і лише він має
     # доступ до /admin. Не задано — адмінки й сповіщень просто немає.
     ADMIN_TELEGRAM_ID: int | None = None
+    PUBLIC_URL: str = "http://localhost:8077"
 
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"

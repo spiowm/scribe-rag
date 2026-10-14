@@ -38,3 +38,8 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     model_config = ConfigDict(from_attributes=True)
+
+
+class LoginCodeResponse(BaseModel):
+    code: str
+    expires_in: int  # секунд

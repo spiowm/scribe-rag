@@ -3,11 +3,13 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, get_mongo
-from src.api.schemas import LinkRequest, UserResponse
+from src.api.dependencies import get_db, get_mongo, get_user
+from src.api.schemas import LinkRequest, LoginCodeResponse, UserResponse
+from src.repository import login_codes, users
 from src.connectors.mongo import MongoConnector
 from src.models.user import User
 from src.repository import users
+
 
 router = APIRouter(
     prefix="/auth",
@@ -41,3 +43,13 @@ async def link(
     user = await users.create_user(db, user)
 
     return user
+
+
+@router.post("/login-code", response_model=LoginCodeResponse)
+async def login_code(
+    user: User = Depends(get_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Код, яким людина входить на сторінці MCP. Видає бот на /mcp_login."""
+    code = await login_codes.create(db, user.id)
+    return LoginCodeResponse(code=code, expires_in=int(login_codes.TTL.total_seconds()))

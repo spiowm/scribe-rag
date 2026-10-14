@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from google import genai
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
+
 from src.api.routers import admin, auth, chat, sync
 from src.config import settings
 from src.connectors.gdrive import GDriveConnector
@@ -13,7 +14,6 @@ from src.connectors.notion import NotionConnector
 from src.db import engine
 from src.generation import agy_cleanup
 from src.generation.chain import RagChain
-from src.mcp_server import mcp
 from src.vectorstore.memes import MemeRepository
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -81,9 +81,7 @@ async def lifespan(app: FastAPI):
             )
         )
 
-    mcp_app.state = app.state
-    async with mcp.session_manager.run():
-        yield
+    yield
 
     if cleanup_task:
         cleanup_task.cancel()
@@ -99,9 +97,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-mcp_app = mcp.streamable_http_app(streamable_http_path="/")
-app.mount("/mcp", mcp_app)
 
 app.include_router(sync.router)
 app.include_router(chat.router)
