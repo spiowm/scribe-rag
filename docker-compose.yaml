@@ -67,6 +67,38 @@ services:
       backend:
         condition: service_started
 
+  mcp:
+    # Той самий образ, що й backend, але запускає лише публічну частину:
+    # MCP і OAuth. Домен дивиться сюди, backend лишається внутрішнім.
+    build: ./backend
+    restart: unless-stopped
+    command: ["uv", "run", "uvicorn", "src.public.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    environment:
+      POSTGRES_HOST: postgres
+      QDRANT_HOST: qdrant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?}
+      MONGO_URI: ${MONGO_URI:?}
+      PUBLIC_URL: ${MCP_PUBLIC_URL:?}
+      # Settings вимагає ці поля, але публічному сервісу вони не потрібні.
+      # Порожні значення — щоб секрети Notion, Drive і R2 не лежали
+      # в контейнері, відкритому в інтернет.
+      NOTION_TOKEN: ""
+      GOOGLE_DRIVE_CREDENTIALS_JSON: ""
+      R2_ACCOUNT_ID: ""
+      R2_ACCESS_KEY_ID: ""
+      R2_SECRET_ACCESS_KEY: ""
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${MCP_HOST_PORT:-8077}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      # Міграції застосовує backend при старті.
+      backend:
+        condition: service_started
+
 volumes:
   postgres_data:
   qdrant_data:
