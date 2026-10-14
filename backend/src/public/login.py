@@ -22,6 +22,7 @@ PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вхід — BEST Lviv</title>
+<link rel="icon" type="image/png" href="/icon.png">
 <style>
   body {{ font-family: system-ui, sans-serif; max-width: 26rem; margin: 3rem auto;
          padding: 0 1rem; line-height: 1.5; }}

@@ -14,12 +14,7 @@ from src.config import settings
 from src.connectors.mongo import MongoConnector
 from src.generation import agy_protocol, tools
 from src.generation.agy_process import AgyError, AgyProcess
-from src.generation.prompts import (
-    GLOSSARY,
-    ORG_PRIMER,
-    SYSTEM_PROMPT,
-    user_context,
-)
+from src.generation.prompts import BOT_PROMPT, user_context
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -72,7 +67,7 @@ class RagChain:
         self.model = model
         self.qdrant = qdrant
         self.mongo = mongo
-        self.system_prompt = SYSTEM_PROMPT + ORG_PRIMER + GLOSSARY
+        self.system_prompt = BOT_PROMPT
 
         self.config = types.GenerateContentConfig(
             tools=[*tools.DECLARATIONS],

@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, HTMLResponse
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from mcp.server.auth.provider import ProviderTokenVerifier
 from mcp.server.auth.settings import (
@@ -22,6 +24,7 @@ from src.vectorstore.qdrant import QdrantRepository
 
 logging.basicConfig(level=logging.INFO)
 PUBLIC_HOST = urlparse(settings.PUBLIC_URL).netloc
+STATIC = Path(__file__).parent / "static"
 
 
 mcp_app = mcp.streamable_http_app(
@@ -80,6 +83,31 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+
+# Логотип конектора. Gemini і claude.ai беруть іконку домену, а без неї
+# підставляли 16-піксельний logo.png з best-lviv.org.ua, розмитий на збільшенні.
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(STATIC / "favicon.ico")
+
+
+@app.get("/icon.png", include_in_schema=False)
+async def icon():
+    return FileResponse(STATIC / "icon.png")
+
+
+@app.get("/", include_in_schema=False)
+async def index():
+    # Сервіси фавіконок читають іконку з <link> на головній сторінці.
+    return HTMLResponse(
+        '<!doctype html><html lang="uk"><head><meta charset="utf-8">'
+        "<title>BEST Lviv — MCP</title>"
+        '<link rel="icon" type="image/png" sizes="512x512" href="/icon.png">'
+        '<link rel="apple-touch-icon" href="/icon.png">'
+        "</head><body><p>MCP-сервер бази знань BEST Lviv. Адреса для "
+        f"підключення: <code>{settings.PUBLIC_URL}/mcp</code></p></body></html>"
+    )
 
 
 app.include_router(login.router)

@@ -31,7 +31,8 @@ async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
     await message.reply(
         f"Код для входу: <code>{code}</code>\n"
         "Діє 5 хвилин і спрацює один раз. Торкнись коду, щоб скопіювати.\n\n"
-        f"Адреса MCP для підключення: <code>{settings.MCP_URL}</code>",
+        f"Адреса MCP для підключення: <code>{settings.MCP_URL}</code>\n"
+        "Назва конектора: <code>BEST Lviv</code>",
         parse_mode="HTML",
     )
 

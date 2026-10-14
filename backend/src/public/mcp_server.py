@@ -3,7 +3,8 @@ import json
 from mcp import types
 from mcp.server.lowlevel.server import Server
 
-from src.generation.prompts import GLOSSARY, MCP_ANSWER_RULES, ORG_PRIMER
+from src.config import settings
+from src.generation.prompts import MCP_INSTRUCTIONS
 from src.generation.tools import TOOLS, Limits
 
 # Клієнти MCP тримають результати в контексті всю розмову, а Claude Code
@@ -48,13 +49,23 @@ async def call_tool(ctx, params) -> types.CallToolResult:
 
 
 mcp = Server(
-    "scribe-rag",
+    # Назва, за якою агент вирішує, чи кликати сервер: «scribe» нічого не каже
+    # про BEST, і питання про жаргон осередку йшли повз базу.
+    "best-lviv",
     title="BEST Lviv",
+    website_url="https://best-lviv.org.ua",
+    icons=[
+        types.Icon(
+            src=f"{settings.PUBLIC_URL}/icon.png",
+            mime_type="image/png",
+            sizes=["512x512"],
+        )
+    ],
     description=(
         "База знань і довідник членів BEST Lviv: процеси, документи, івенти, "
         "люди, посади, статистика складу."
     ),
-    instructions=ORG_PRIMER + GLOSSARY + MCP_ANSWER_RULES,
+    instructions=MCP_INSTRUCTIONS,
     on_list_tools=list_tools,
     on_call_tool=call_tool,
 )
