@@ -153,7 +153,7 @@ class RagChain:
         if emit := run.get("on_event"):
             emit(f"{text}…")
 
-        return await spec.run(self, args)
+        return await spec.run(self, args, tools.Limits())
 
     async def _reply_via_agy(
         self, message: str, history: list[Message], member: dict | None

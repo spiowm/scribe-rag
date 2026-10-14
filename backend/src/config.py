@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     AGY_BIN: str = "agy"
     AGY_HOME: str = str(Path.home() / ".agy-bot")
     AGY_WORKDIR: str = str(Path.home() / ".agy-bot-ws")
-    AGY_MODEL: str = "gemini-3.7-flash-medium"
+    AGY_MODEL: str = "gemini-3.8-flash-low"
     AGY_TURN_TIMEOUT: float = 120
     AGY_MAX_PROCS: int = 10
     AGY_STATE_TTL_DAYS: float = 3

@@ -164,7 +164,7 @@ GET_DOCUMENT_TOOL = types.Tool(
             name="get_document",
             description=(
                 "Читає документ бази знань ЦІЛКОМ, а не фрагментами.\n"
-                "Навіщо: пошук віддає 25 фрагментів з усієї бази, а один "
+                "Навіщо: пошук віддає лише найближчі фрагменти з усієї бази, а один "
                 "документ може мати 127 чанків. Тому на питання «дай усі X з "
                 "цього документа» пошук фізично не може відповісти повно: "
                 "у протоколі SAAR 17 голосувань, і один запит приносить 3 з них. "
@@ -292,11 +292,14 @@ FIND_BY_POSITION_TOOL = types.Tool(
 
 
 async def run_search(
-    qdrant: QdrantRepository, query: str, terms: list[str] | None = None
+    qdrant: QdrantRepository,
+    query: str,
+    terms: list[str] | None,
+    limit: int,
 ) -> dict:
     """Виконує пошук і готує результат для моделі."""
     try:
-        hits = await qdrant.search(query, terms=terms)
+        hits = await qdrant.search(query, terms=terms, limit=limit)
     except Exception:
         logger.exception("tool search failed: %r terms=%r", query, terms)
         return {"error": "пошук тимчасово недоступний"}
@@ -411,10 +414,7 @@ async def run_find_by_position(mongo: MongoConnector, position: str) -> dict:
     return result
 
 
-PART_CHARS = 60_000  # ~20 тис. токенів на частину
-
-
-async def run_get_document(source_id: str, part: int = 1) -> dict:
+async def run_get_document(source_id: str, part: int, part_chars: int) -> dict:
     """Віддає повний текст документа — той самий, що пішов у чанкер."""
     try:
         async with async_session_maker() as db:
@@ -431,9 +431,9 @@ async def run_get_document(source_id: str, part: int = 1) -> dict:
             )
         }
 
-    total = max(1, -(-len(doc.text) // PART_CHARS))
+    total = max(1, -(-len(doc.text) // part_chars))
     part = max(1, min(part, total))
-    start = (part - 1) * PART_CHARS
+    start = (part - 1) * part_chars
 
     logger.info(
         "tool get_document: %r частина %d/%d (%d символів)",
@@ -445,7 +445,7 @@ async def run_get_document(source_id: str, part: int = 1) -> dict:
         "last_edited": doc.last_edited,
         "part": part,
         "parts_total": total,
-        "text": doc.text[start : start + PART_CHARS],
+        "text": doc.text[start : start + part_chars],
     }
     if doc.path:
         result["path"] = doc.path
@@ -482,6 +482,18 @@ async def run_query_members(mongo: MongoConnector, **kwargs) -> dict:
 
 
 @dataclass(frozen=True)
+class Limits:
+    """Скільки інструменти віддають за раз — залежить від того, хто питає.
+
+    Бот викидає результати інструментів після кожної відповіді, а MCP-клієнт
+    тримає їх у контексті всю розмову, тож йому потрібні менші порції.
+    """
+
+    search: int = 25  # фрагментів на основний запит і на кожен термін окремо
+    document_part: int = 60_000  # символів у частині документа, ~20 тис. токенів
+
+
+@dataclass(frozen=True)
 class ToolSpec:
     """Усе про один інструмент в одному місці.
 
@@ -492,7 +504,8 @@ class ToolSpec:
     """
 
     declaration: types.Tool
-    run: Callable[[Any, dict], Awaitable[dict]]  # (ланцюг, аргументи) -> результат
+    # (ланцюг, аргументи, ліміти) -> результат
+    run: Callable[[Any, dict, Limits], Awaitable[dict]]
     label: str  # як дія зветься для людини: «Пошук в базі»
     icon: str  # для згорнутого блока в повідомленні
     arg: str | None = None  # який аргумент показати поруч із назвою
@@ -535,8 +548,8 @@ def _by_name(*specs: ToolSpec) -> dict[str, ToolSpec]:
 TOOLS = _by_name(
     ToolSpec(
         declaration=SEARCH_TOOL,
-        run=lambda chain, args: run_search(
-            chain.qdrant, args.get("query", ""), args.get("terms")
+        run=lambda chain, args, limits: run_search(
+            chain.qdrant, args.get("query", ""), args.get("terms"), limits.search
         ),
         label="Пошук в базі",
         icon="🔎",
@@ -544,14 +557,16 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=FIND_PERSON_TOOL,
-        run=lambda chain, args: run_find_person(chain.mongo, args.get("name", "")),
+        run=lambda chain, args, _limits: run_find_person(
+            chain.mongo, args.get("name", "")
+        ),
         label="Перегляд профілю",
         icon="👤",
         arg="name",
     ),
     ToolSpec(
         declaration=FIND_BY_POSITION_TOOL,
-        run=lambda chain, args: run_find_by_position(
+        run=lambda chain, args, _limits: run_find_by_position(
             chain.mongo, args.get("position", "")
         ),
         label="Пошук за посадою",
@@ -561,15 +576,17 @@ TOOLS = _by_name(
     ToolSpec(
         declaration=GET_DOCUMENT_TOOL,
         # документ читається з нашої БД, ланцюг тут не потрібен
-        run=lambda _chain, args: run_get_document(
-            args.get("source_id", ""), int(args.get("part") or 1)
+        run=lambda _chain, args, limits: run_get_document(
+            args.get("source_id", ""),
+            int(args.get("part") or 1),
+            limits.document_part,
         ),
         label="Читання документа",
         icon="📄",
     ),
     ToolSpec(
         declaration=QUERY_MEMBERS_TOOL,
-        run=lambda chain, args: run_query_members(chain.mongo, **args),
+        run=lambda chain, args, _limits: run_query_members(chain.mongo, **args),
         label="Перегляд інфобука",
         icon="📊",
         describe=_members_label,
