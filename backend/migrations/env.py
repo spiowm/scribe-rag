@@ -10,6 +10,7 @@ from src.config import settings
 from src.models.base import Base
 from src.models.chat_session import ChatSession  # noqa: F401
 from src.models.document import Document  # noqa: F401
+from src.models.mcp_call import McpCall  # noqa: F401
 from src.models.message import Message  # noqa: F401
 from src.models.oauth import LoginCode, OAuthClient, OAuthToken  # noqa: F401
 from src.models.user import User  # noqa: F401
