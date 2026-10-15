@@ -1,12 +1,18 @@
 import html
 import json
+import logging
+import time
 
 from mcp import types
 from mcp.server.lowlevel.server import Server
 
 from src.config import settings
+from src.db import async_session_maker
 from src.generation.prompts import MCP_ABOUT, MCP_INSTRUCTIONS, MCP_SEARCH_RULES
 from src.generation.tools import TOOLS, Limits
+from src.models.mcp_call import McpCall
+
+logger = logging.getLogger(__name__)
 
 # Клієнти MCP тримають результати в контексті всю розмову, а Claude Code
 # відкидає відповідь інструмента понад ~25 тис. токенів. Із заміру: 37 тис.
@@ -83,17 +89,58 @@ def document_as_text(result: dict, source_id: str) -> str:
     return f"<document {head}>\n{result['text']}\n</document>"
 
 
+async def save_call(
+    ctx, tool: str, args: dict, result: dict, text: str, ms: int
+) -> None:
+    """Журнал не має ламати відповідь: не записалось — лише рядок у лог.
+
+    MCP-сервіс міграцій не запускає (це робить backend на старті), тож
+    одразу після деплою таблиці ще може не бути.
+    """
+    # Хто питає — з токена, який уже перевірив OAuth-шар SDK.
+    token = ctx.request.user.access_token
+    try:
+        async with async_session_maker() as db:
+            db.add(
+                McpCall(
+                    user_id=int(token.subject),
+                    client_id=token.client_id,
+                    tool=tool,
+                    args=args,
+                    # Кілька фрагментів одного документа — один source_id.
+                    source_ids=list(
+                        dict.fromkeys(r["source_id"] for r in result.get("results", []))
+                    ),
+                    result_chars=len(text),
+                    error=result.get("error"),
+                    ms=ms,
+                )
+            )
+            await db.commit()
+    except Exception:
+        logger.exception("mcp_calls: виклик %s не записано", tool)
+
+
 async def call_tool(ctx, params) -> types.CallToolResult:
     spec = TOOLS[params.name]
     deps = ctx.request.app.state
     args = params.arguments or {}
-    result = await spec.run(deps, args, LIMITS)
+    started = time.monotonic()
+    try:
+        result = await spec.run(deps, args, LIMITS)
+    except Exception as exc:
+        # Клієнту помилку віддасть SDK, а в журнал вона йде тут.
+        ms = round((time.monotonic() - started) * 1000)
+        await save_call(ctx, params.name, args, {"error": repr(exc)}, "", ms)
+        raise
+    ms = round((time.monotonic() - started) * 1000)
     if params.name == "search_knowledge_base" and "results" in result:
         text = search_as_text(result["results"]) or "Нічого не знайдено."
     elif params.name == "get_document" and "text" in result:
         text = document_as_text(result, args.get("source_id", ""))
     else:
         text = json.dumps(result, ensure_ascii=False)
+    await save_call(ctx, params.name, args, result, text, ms)
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=text)],
         is_error="error" in result,
