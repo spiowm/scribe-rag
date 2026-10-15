@@ -29,10 +29,10 @@ async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
         )
         return
     await message.reply(
-        "Назва конектора: <code>BEST Lviv</code>\n"
-        f"Адреса MCP для підключення: <code>{settings.MCP_URL}</code>\n"
-        f"Код для входу: <code>{code}</code>\n\n"
-        "Код діє 5 хвилин і спрацює один раз. Торкнись, щоб скопіювати.",
+        "<b>Назва конектора:</b> <code>BEST Lviv</code>\n"
+        f"<b>Адреса MCP для підключення:</b> <code>{settings.MCP_URL}</code>\n"
+        f"<b>Код для входу:</b> <code>{code}</code>\n\n"
+        "<i>Код діє 5 хвилин і спрацює один раз. Торкнись, щоб скопіювати.</i>",
         parse_mode="HTML",
     )
 
