@@ -29,11 +29,23 @@ async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
         )
         return
     await message.reply(
-        "<b>Назва конектора:</b> <code>BEST Lviv</code>\n"
-        f"<b>Адреса MCP для підключення:</b> <code>{settings.MCP_URL}</code>\n"
-        f"<b>Код для входу:</b> <code>{code}</code>\n\n"
-        "<i>Код діє 5 хвилин і спрацює один раз. Торкнись, щоб скопіювати.</i>",
+        '🔌 <b>Підключи базу BEST Lviv до свого AI-чату</b>\n'
+        "\n"
+        '<b>1.</b> Додай конектор: <a href="https://gemini.google.com/customize/connectors">Gemini</a>'
+        ' · <a href="https://claude.ai/new?modal=add-custom-connector#customize/connectors/yours">Claude</a>'
+        ' · <a href="https://chatgpt.com/plugins">ChatGPT</a>\n'
+        "\n"
+        f"Назва: <code>BEST Lviv</code>\n"
+        f"URL: <code>{settings.MCP_URL}</code>\n"
+        "\n"
+        f"<b>2.</b> На сторінці входу встав цей код:\n"
+        f"<code>{code}</code>\n"
+        "\n"
+        '<b>3.</b> У Gemini / ChatGPT починай з <code>@BEST Lviv</code>\n'
+        "\n"
+        "<i>Код діє 5 хв і спрацює один раз.</i>",
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
 
 
