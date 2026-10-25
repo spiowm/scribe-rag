@@ -1,9 +1,11 @@
+import httpx
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 from src.api_client import ApiClient
 from src.config import settings
+from src.handlers.onboarding import starter_kb
 
 router = Router()
 
@@ -50,8 +52,23 @@ async def cmd_mcp_login(message: types.Message, api_client: ApiClient):
 
 
 @router.message(Command("start"))
-async def cmd_start(message: types.Message):
-    name = message.from_user.first_name if message.from_user else "друже"
+async def cmd_start(message: types.Message, api_client: ApiClient):
+    assert message.from_user
+    # /start прилітає й від уже прив'язаних: з меню, після очищення чату,
+    # з посилання на бота. Їм кнопка з номером ні до чого.
+    try:
+        user = await api_client.me(message.from_user.id)
+    except httpx.HTTPError:
+        user = None  # бекенд недоступний: показуємо кнопку, прив'язка сама скаже, що не так
+    if user is not None:
+        await message.reply(
+            f"З поверненням, {user.first_name}!\n\n"
+            "Тицьни питання знизу, щоб спробувати, або пиши своє.",
+            reply_markup=starter_kb,
+        )
+        return
+
+    name = message.from_user.first_name
     await message.reply(
         text=f"Привіт, {name}! Я асистент BEST Lviv.\n"
         "Просто напиши питання — і я знайду відповідь у нашій базі знань.\n"

@@ -1,10 +1,28 @@
 import httpx
 from aiogram import F, Router, types
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from src.api_client import ApiClient
 
 router = Router()
+
+# Перше, що бачить людина після доступу. Відібрані прогоном через бота:
+# стабільно дають відповідь із бази і працюють навіть для свіжого обзервера.
+STARTER_QUESTIONS = [
+    "Просмаж мене по-бестівськи 🔥",
+    "Хто мій ангел і чим він відомий?",
+    "Найдивніші рішення, які ухвалював осередок",
+    "Іспит на фула: відповіді сховай 🔒",
+]
+
+# По одній у ряд, бо вдвох довші тексти обрізаються. Тап надсилає текст
+# кнопки звичайним повідомленням, тож далі його обробляє chat.py.
+starter_kb = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text=q)] for q in STARTER_QUESTIONS],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+    input_field_placeholder="Або напиши своє питання",
+)
 
 
 @router.message(F.contact)
@@ -39,6 +57,7 @@ async def on_contact(message: types.Message, api_client: ApiClient):
         return
 
     await message.answer(
-        f"Вітаю, {user.first_name}! Доступ відкрито. Можеш задавати питання.",
-        reply_markup=ReplyKeyboardRemove(),
+        f"Вітаю, {user.first_name}! Доступ відкрито.\n\n"
+        "Тицьни питання знизу, щоб спробувати, або пиши своє.",
+        reply_markup=starter_kb,
     )

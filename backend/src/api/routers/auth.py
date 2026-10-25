@@ -45,6 +45,12 @@ async def link(
     return user
 
 
+@router.post("/me", response_model=UserResponse)
+async def me(user: User = Depends(get_user)):
+    """Чи прив'язаний цей telegram_id. Неприв'язаному get_user віддає 403."""
+    return user
+
+
 @router.post("/login-code", response_model=LoginCodeResponse)
 async def login_code(
     user: User = Depends(get_user),

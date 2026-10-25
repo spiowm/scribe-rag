@@ -36,6 +36,16 @@ class ApiClient:
 
         return UserResponse.model_validate(response.json())
 
+    async def me(self, telegram_id: int) -> UserResponse | None:
+        """None — людина ще не підтвердила номер."""
+        response = await self._client.post(
+            "/auth/me", json={"telegram_id": telegram_id}
+        )
+        if response.status_code == 403:
+            return None
+        response.raise_for_status()
+        return UserResponse.model_validate(response.json())
+
     async def new_session(self, telegram_id: int) -> None:
         response = await self._client.post(
             "/chat/session/new", json={"telegram_id": telegram_id}
