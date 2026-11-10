@@ -115,3 +115,45 @@ def test_colors_without_dates_add_nothing():
     fills = {"A3": yellow, "B3": yellow, "C3": yellow, "B2": yellow}
     text, _ = sheet_text(colored_book(fills, values))
     assert "кольором" not in text
+
+
+def _meta(title="План.xlsx"):
+    from src.ingestion.schemas import ChunkMetadata
+
+    return ChunkMetadata(
+        source="gdrive", source_id="x", title=title, url="u",
+        last_edited="t", path="Диск/Тека", scope="general",
+    )  # fmt: skip
+
+
+def test_table_is_one_fragment_when_it_fits():
+    from src.ingestion.chunker import Chunker
+
+    sheets = "\n\n".join(
+        f"## Аркуш «{i}» · рядків: 1 · колонки: А, Б\nрядок {i} — А: {'x' * 300}"
+        for i in range(6)
+    )
+    text = "Таблиця «План» · Диск/Тека. Повний вміст — get_document.\n" + sheets
+    nodes = Chunker().chunk_table(text, _meta())
+    assert len(nodes) == 1 and nodes[0].text == text.strip()
+    assert nodes[0].metadata["scope"] == "general"
+
+
+def test_big_table_splits_on_sheets_with_title_in_each():
+    from src.ingestion.chunker import Chunker
+
+    head = "Таблиця «План» · Диск/Тека. Повний вміст — get_document."
+    sheets = [
+        f"## Аркуш «{i}» · рядків: 3 · колонки: А\n"
+        + "\n".join(f"запис {i}.{j} — А: {'слово ' * 60}" for j in range(3))
+        for i in range(8)
+    ]
+    nodes = Chunker().chunk_table(head + "\n" + "\n".join(sheets), _meta(), size=400)
+    assert len(nodes) > 1
+    for node in nodes:
+        assert node.text.startswith(head + "\n## Аркуш «")
+        # запис не розрізано: кожен рядок тексту — цілий рядок таблиці
+        assert all(
+            line == head or line.startswith(("## Аркуш", "запис "))
+            for line in node.text.split("\n")
+        )

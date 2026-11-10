@@ -375,10 +375,9 @@ async def index(
         # тут: зміна його формату доходить до індексу через `full`, без
         # повторного завантаження. Бази Notion беруть опис із сирих рядків —
         # його рахує крок 1.
-        summary = (
-            table_summary(doc.text, doc.title, doc.path)
-            if doc.text.startswith(HEAD)
-            else doc.summary
-        )
-        nodes.extend(chunker.chunk(summary or doc.text, metadata))
+        if doc.text.startswith(HEAD):
+            summary = table_summary(doc.text, doc.title, doc.path)
+            nodes.extend(chunker.chunk_table(summary or doc.text, metadata))
+            continue
+        nodes.extend(chunker.chunk(doc.summary or doc.text, metadata))
     return await qdrant.reindex(fresh_nodes=nodes, stale_ids=stale)
