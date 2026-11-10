@@ -512,7 +512,7 @@ def test_logo_text_is_not_indexed_but_tables_and_notion_are(monkeypatch):
         "gdrive": {
             "logo": "RED",
             "doc": "Регламент закупівель: хто погоджує, як звітувати. " * 5,
-            "sheet": _book_text([("A", [["Стаття", "Сума"], ["їжа", "700"]])]),
+            "sheet": _book_text([("A", [["Стаття", "Сума"], ["їжа", "700"]], [])]),
         },
         "notion": {
             "board": "### President\nАртем Беренда",

@@ -19,6 +19,8 @@ from typing import Literal
 import xlrd
 from openpyxl import load_workbook
 
+from src.ingestion.sheet_colors import colored_lines
+
 MAX_ROWS = 400  # аркуш довший за це — форма на сотні відповідей, хвіст позначається
 DAYS = {
     "ПН",
@@ -133,9 +135,12 @@ def read_sheet(values: Iterable[Sequence]) -> dict | None:
     }
 
 
-def _book_text(sheets: Iterable[tuple[str, Iterable[Sequence]]]) -> str:
+def _book_text(
+    sheets: Iterable[tuple[str, Iterable[Sequence], list[str]]],
+) -> str:
+    """Аркуші: назва, рядки значеннями й рядки з кольорів (`sheet_colors`)."""
     blocks: list[str] = []
-    for name, values in sheets:
+    for name, values, colored in sheets:
         got = read_sheet(values)
         if not got or not got["lines"]:
             continue
@@ -148,16 +153,21 @@ def _book_text(sheets: Iterable[tuple[str, Iterable[Sequence]]]) -> str:
             f"{HEAD} «{name}» · рядків: {got['rows']}{cut} · "
             f"колонки: {', '.join(got['columns'][:20])}"
         )
-        blocks.append(head + "\n" + "\n".join(got["lines"]))
+        blocks.append(head + "\n" + "\n".join(got["lines"] + colored))
     return "\n\n".join(blocks)
 
 
 def sheet_text(blob: bytes) -> tuple[str, int]:
-    """Усі аркуші книги текстом. Сторінок нуль — OCR тут не застосовний."""
-    wb = load_workbook(io.BytesIO(blob), read_only=True, data_only=True)
+    """Усі аркуші книги текстом. Сторінок нуль — OCR тут не застосовний.
+
+    Не `read_only`: у ньому немає обʼєднаних клітинок, а без них кольори
+    календаря не прочитати.
+    """
+    wb = load_workbook(io.BytesIO(blob), data_only=True)
     try:
         text = _book_text(
-            (name, wb[name].iter_rows(values_only=True)) for name in wb.sheetnames
+            (ws.title, ws.iter_rows(values_only=True), colored_lines(ws))
+            for ws in wb.worksheets
         )
     finally:
         wb.close()
@@ -191,6 +201,7 @@ def xls_text(blob: bytes) -> tuple[str, int]:
         (
             sh.name,
             ([_xls_value(c, datemode) for c in sh.row(i)] for i in range(sh.nrows)),
+            [],
         )
         for sh in book.sheets()
     )
