@@ -30,6 +30,7 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: ci
       QDRANT_HOST: localhost
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: astral-sh/setup-uv@v10.3.3
