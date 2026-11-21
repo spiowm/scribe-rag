@@ -10,18 +10,18 @@
 
 ## Demo
 
-> **Member** · дай лінки на бестівські сайти
->
-> **Scribe**
->
-> - **BEST::HACKath0n**:
->   - Чинний/актуальний: [hack.best-lviv.org.ua](https://hack.best-lviv.org.ua/)
-> - **BEC (Engineering Competition)**:
->   - Чинний: [bec.best-lviv.org.ua](https://bec.best-lviv.org.ua/)
-> - **ІЯК (EJF — Engineering Job Fair)**:
->   - Чинний: [ejf.best-lviv.org.ua](https://ejf.best-lviv.org.ua/)
+Scribe answers a question about BEST Lviv in Ukrainian and links to the documents it used.
 
-Excerpt from a Scribe conversation in Telegram showing the public event links in the reply.
+<p align="center">
+  <img src="docs/assets/demo-telegram.webp" width="380" alt="Telegram exchange in Ukrainian with a knowledge-base search and three source links">
+</p>
+
+<details>
+<summary>MCP tools in Claude</summary>
+
+<img src="docs/assets/demo-mcp.webp" width="680" alt="Claude showing the five read-only tools exposed by the Scribe MCP connector">
+
+</details>
 
 ## Architecture
 
