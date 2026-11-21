@@ -57,6 +57,8 @@ from paired
 RATED = text("""
 select a.rating, a.created_at, a.content as answer,
        u.telegram_username,
+       -- журнал прогону (`chain.run_record`); у відповідей до M1 — null
+       a.run,
        (select q.content from messages q
          where q.session_id = a.session_id
            and q.role = 'user'

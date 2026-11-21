@@ -39,8 +39,9 @@ async def add_message(
     session_id: int,
     role: str,
     content: str,
+    run: dict | None = None,
 ) -> Message:
-    message = Message(session_id=session_id, role=role, content=content)
+    message = Message(session_id=session_id, role=role, content=content, run=run)
     db.add(message)
     await db.commit()
     await db.refresh(message)
