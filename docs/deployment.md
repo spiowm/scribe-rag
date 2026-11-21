@@ -40,13 +40,7 @@ Review the application's deployment policy before pushing changes to its watched
 
 ### Scheduled sync
 
-Sync is incremental: it extracts changed files and embeds only changed documents. [`sync_all.py`](../backend/scripts/sync_all.py) syncs Notion and Drive and then refreshes drive permissions through the backend's internal API. Add it in Coolify under **Scheduled Tasks**, select the `backend` container and use this command:
-
-```bash
-uv run --no-dev python scripts/sync_all.py
-```
-
-Scheduled tasks use the server timezone. For example, `0 1 * * *` runs at 01:00 server time. A failed step makes the task exit with code 1. Use **Execute Now** once to check the command and container. [Coolify cron syntax](https://coolify.io/docs/core/automation/cron-syntax)
+The backend syncs Notion and Drive and then refreshes drive permissions on its own schedule. The bot owner sets the interval with `/autosync <hours>` and turns it off with `/autosync off`; `/autosync` alone shows the interval and the result of the last run. Auto-sync is off until the owner sets an interval. The interval and the time of the last run are stored in Postgres, so a redeploy does not start an extra sync. Sync is incremental: it extracts changed files and embeds only changed documents. [Auto-sync](../backend/src/ingestion/autosync.py)
 
 ## Sign in to agy
 

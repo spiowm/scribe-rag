@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SyncResponse(BaseModel):
@@ -48,6 +48,11 @@ class UserResponse(BaseModel):
 class LoginCodeResponse(BaseModel):
     code: str
     expires_in: int  # секунд
+
+
+class AutosyncRequest(BaseModel):
+    telegram_id: int
+    hours: int = Field(ge=0, le=24 * 30)  # 0 — вимкнути
 
 
 class GroupImportRequest(BaseModel):

@@ -15,6 +15,7 @@ from src.connectors.notion import NotionConnector
 from src.db import engine
 from src.generation import agy_cleanup, models_check
 from src.generation.chain import RagChain
+from src.ingestion import autosync
 from src.vectorstore.memes import MemeRepository
 from src.vectorstore.qdrant import QdrantRepository
 
@@ -102,8 +103,11 @@ async def lifespan(app: FastAPI):
             )
         )
 
+    autosync_task = asyncio.create_task(autosync.loop(app))
+
     yield
 
+    autosync_task.cancel()
     models_task.cancel()
     if cleanup_task:
         cleanup_task.cancel()

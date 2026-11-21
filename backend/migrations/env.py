@@ -14,6 +14,7 @@ from src.models.document import Document  # noqa: F401
 from src.models.mcp_call import McpCall  # noqa: F401
 from src.models.message import Message  # noqa: F401
 from src.models.oauth import LoginCode, OAuthClient, OAuthToken  # noqa: F401
+from src.models.setting import Setting  # noqa: F401
 from src.models.user import User  # noqa: F401
 
 config = context.config
