@@ -1,11 +1,12 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # dbus + gnome-keyring — Secret Service, з якого agy бере токен підписки;
-# libsecret-tools дає secret-tool для пересадки; util-linux — setpriv.
+# libsecret-tools дає secret-tool для пересадки; util-linux — setpriv;
+# antiword — текст старих .doc (0.6 МБ замість ~420 МБ LibreOffice).
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
         dbus dbus-x11 gnome-keyring libsecret-tools util-linux \
-        curl ca-certificates \
+        curl ca-certificates antiword \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 app
@@ -53,4 +54,8 @@ EXPOSE 8000
 # Стартуємо root-ом: ентрипойнт прибирає /.dockerenv і сам переходить на app.
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
 # uvicorn в один процес: BUSY і AGY_SEMAPHORE живуть у памʼяті процесу.
-CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+# --no-dev: `uv run` синхронізує середовище з типовими групами, тобто й з dev
+# (pytest), і без прапорця ставив би його на кожному старті контейнера.
+# exec: інакше PID 1 лишається sh, SIGTERM до uvicorn не доходить, і зупинка
+# щоразу чекає 10 с і закінчується SIGKILL без закриття з'єднань.
+CMD ["sh", "-c", "uv run --no-dev alembic upgrade head && exec uv run --no-dev uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1"]

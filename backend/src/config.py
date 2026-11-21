@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import Field, computed_field, field_validator
+from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # Телеграм-id власника: йому йдуть сповіщення про збої, і лише він має
     # доступ до /admin. Не задано — адмінки й сповіщень просто немає.
     ADMIN_TELEGRAM_ID: int | None = None
+    # Спільний секрет бота й бекенда (M3). Внутрішній API вірить telegram_id
+    # з тіла запиту, тож без секрету будь-хто з доступом до порту видав би себе
+    # за іншого й читав би чужі диски. Не задано — перевірки немає (локально).
+    INTERNAL_API_TOKEN: str = ""
     TELEGRAM_BOT_USERNAME: str = "best_lviv_assistant_bot"
     PUBLIC_URL: str = "http://localhost:8077"
 
@@ -27,22 +31,39 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION_NAME: str = "general"
     QDRANT_MEMES_COLLECTION: str = "memes"
 
-    R2_ACCOUNT_ID: str = Field()
-    R2_ACCESS_KEY_ID: str = Field()
-    R2_SECRET_ACCESS_KEY: str = Field()
+    # Секрети R2, Notion і Drive потрібні лише конекторам backend, тому тут
+    # необовʼязкові: публічний MCP-сервіс стартує без них. Backend перевіряє
+    # їх на старті (`BACKEND_SECRETS` у `src/api/main.py`).
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET: str = "scribe-rag"
 
-    NOTION_TOKEN: str = Field()
-    NOTION_USERS_DB_ID: str = "3052e2ad-04c6-4950-8e1b-cb2f082d70f2"
+    NOTION_TOKEN: str = ""
+    NOTION_USERS_DB_ID: str = ""
+    # Бази Notion, що індексуються табличними документами: id бази (з її
+    # посилання) через кому, за потреби з relation-властивістю розбиття після
+    # двокрапки: `817b…:Події` — частина на кожну подію. Порожньо — бази не
+    # беруться, як і раніше.
+    NOTION_DATABASE_IDS: str = ""
 
-    GOOGLE_DRIVE_CREDENTIALS_JSON: str = Field()
-    GOOGLE_DRIVE_FOLDER_IDS: str = (
-        "18JB-5VzOo1MLUZpXADeT1EkRiX7X1-Sb,1n3CYo7A3nUm8bZngu39z9d3a1uful8KL"
-    )
+    GOOGLE_DRIVE_CREDENTIALS_JSON: str = ""
+    # Загальний диск та дозволені джерела ярликів із зовнішніх дисків.
+    GOOGLE_DRIVE_GENERAL_ID: str = ""
+    GOOGLE_DRIVE_GENERAL_FOREIGN: str = ""
+    GOOGLE_DRIVE_GENERAL_FOREIGN_LABEL: str = "інші загальні джерела"
+    GOOGLE_DRIVE_FULL_MEMBERS_GROUP: str = ""
+    GOOGLE_DRIVE_ADMIN_GROUP: str = ""
+    # Диски, що індексуються цілком і вмикаються галочкою: id через кому.
+    GOOGLE_DRIVE_IDS: str = ""
+    GOOGLE_DRIVE_PAUSED_IDS: str = ""
 
     GEMINI_API_KEY: str = Field()
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
-    GEMINI_LLM_MODEL: str = "gemini-3.7-flash"
+    # Модель для OCR та відповідей через API, незалежна від AGY_MODEL.
+    # Для OCR рівень роздумів LOW задається в ingestion/extractors.py.
+    GEMINI_LLM_MODEL: str = "gemini-3.8-flash"
+    ORG_CONTEXT: SecretStr = SecretStr("")
 
     # Модель через підписку agy замість платного API. "gemini" — через API.
     LLM_PROVIDER: str = "agy"
@@ -71,6 +92,11 @@ class Settings(BaseSettings):
         """
         return value or None
 
+    @field_validator("GOOGLE_DRIVE_FULL_MEMBERS_GROUP", "GOOGLE_DRIVE_ADMIN_GROUP")
+    @classmethod
+    def _normalize_group_email(cls, value: str) -> str:
+        return value.strip().lower()
+
     @computed_field
     @property
     def POSTGRES_URL(self) -> str:
@@ -87,8 +113,42 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def GOOGLE_DRIVE_ROOTS(self) -> list[str]:
-        return [x.strip() for x in self.GOOGLE_DRIVE_FOLDER_IDS.split(",") if x.strip()]
+    def GENERAL_FOREIGN_DRIVES(self) -> set[str]:
+        return {
+            x.strip() for x in self.GOOGLE_DRIVE_GENERAL_FOREIGN.split(",") if x.strip()
+        }
+
+    @computed_field
+    @property
+    def GOOGLE_DRIVES(self) -> list[str]:
+        return [x.strip() for x in self.GOOGLE_DRIVE_IDS.split(",") if x.strip()]
+
+    @property
+    def PAUSED_DRIVES(self) -> set[str]:
+        return {
+            drive.strip()
+            for drive in self.GOOGLE_DRIVE_PAUSED_IDS.split(",")
+            if drive.strip()
+        }
+
+    @model_validator(mode="after")
+    def _pause_only_drive_scopes(self) -> "Settings":
+        # Загальне має одну мітку для Notion і кількох джерел Drive.
+        general = {self.GOOGLE_DRIVE_GENERAL_ID.strip(), *self.GENERAL_FOREIGN_DRIVES}
+        if self.PAUSED_DRIVES & general:
+            raise ValueError("GOOGLE_DRIVE_PAUSED_IDS accepts only work drives")
+        return self
+
+    @computed_field
+    @property
+    def NOTION_DATABASES(self) -> list[tuple[str, str | None]]:
+        """[(id бази, властивість розбиття або None)]."""
+        out = []
+        for item in self.NOTION_DATABASE_IDS.split(","):
+            db_id, _, split_by = item.strip().partition(":")
+            if db_id:
+                out.append((db_id.strip(), split_by.strip() or None))
+        return out
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(BASE_DIR, ".env"),
