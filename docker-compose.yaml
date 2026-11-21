@@ -38,7 +38,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       NOTION_TOKEN: ${NOTION_TOKEN:?}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
-      ORG_CONTEXT: ${ORG_CONTEXT:-}
       MONGO_URI: ${MONGO_URI:?}
       GOOGLE_DRIVE_CREDENTIALS_JSON: ${GOOGLE_DRIVE_CREDENTIALS_JSON:?}
       # робочі диски в пошуку (id через кому); порожньо — лише загальне

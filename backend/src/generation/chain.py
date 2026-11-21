@@ -14,7 +14,7 @@ from google.genai import types
 from src.config import settings
 from src.connectors.mongo import MongoConnector
 from src.generation import agy_protocol, models_check, tools
-from src.generation.agy_process import AgyError, AgyProcess, AgyProviderError
+from src.generation.agy_process import AgyError, AgyProcess
 from src.generation.prompts import BOT_PROMPT, user_context
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
@@ -101,15 +101,6 @@ class RagChain:
         self.qdrant = qdrant
         self.mongo = mongo
         self.system_prompt = BOT_PROMPT
-        org_context = settings.ORG_CONTEXT.get_secret_value()
-        self.has_org_context = bool(org_context.strip())
-        if self.has_org_context:
-            self.system_prompt += (
-                "\n\n## Контекст організації\n\n"
-                "Ця довідка допомагає зрозуміти терміни. Підтверджуй факти "
-                "джерелами й цитуй результати пошуку.\n\n"
-                + org_context
-            )
 
         self.config = types.GenerateContentConfig(
             tools=[*tools.DECLARATIONS],
@@ -337,26 +328,19 @@ class RagChain:
                         message, history, member, scopes, drives
                     )
                 except AgyError as exc:
-                    # Помилки провайдера можуть містити вхідні дані.
-                    hide_detail = self.has_org_context and isinstance(
-                        exc, AgyProviderError
-                    )
-                    detail = "невдала відповідь провайдера" if hide_detail else str(exc)
                     run.setdefault("errors", []).append(
-                        f"agy, спроба {attempt}: {detail[:300]}"
+                        f"agy, спроба {attempt}: {str(exc)[:300]}"
                     )
                     logger.warning(
                         "agy не впорався (спроба %d з %d): %s",
                         attempt,
                         settings.AGY_ATTEMPTS,
-                        detail,
+                        exc,
                     )
                     if (
                         attempt == settings.AGY_ATTEMPTS
                         and not settings.AGY_FALLBACK_TO_API
                     ):
-                        if hide_detail:
-                            raise AgyError(detail) from None
                         raise
             run.update(
                 provider="gemini",
@@ -391,7 +375,8 @@ class RagChain:
 
         for step in range(1, NUM_ITERATIONS + 1):
             current_run()["steps"] = step
-            response = await self._generate_content(
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
                 contents=contents,
                 config=self.config.model_copy(
                     update={
@@ -436,7 +421,8 @@ class RagChain:
         logger.warning(
             "agent: вичерпано %d ітерацій, відповідаю зібраним", NUM_ITERATIONS
         )
-        response = await self._generate_content(
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
             contents=contents,
             config=self.final_config.model_copy(
                 update={"system_instruction": self._system_instruction(member, drives)}
@@ -444,17 +430,3 @@ class RagChain:
         )
 
         return response.text or "Вибач, не вдалось сформувати відповідь"
-
-    async def _generate_content(
-        self,
-        contents: list[types.ContentUnion],
-        config: types.GenerateContentConfig,
-    ) -> types.GenerateContentResponse:
-        try:
-            return await self.client.aio.models.generate_content(
-                model=self.model, contents=contents, config=config
-            )
-        except genai.errors.APIError as exc:
-            if self.has_org_context:
-                raise RuntimeError(f"Gemini API: HTTP {exc.code}") from None
-            raise
