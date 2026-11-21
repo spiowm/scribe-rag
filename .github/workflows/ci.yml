@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s
+          --health-timeout 3s --health-retries 20
+      qdrant:
+        image: qdrant/qdrant:v1.17
+        ports: ["6333:6333"]
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: ci
+      QDRANT_HOST: localhost
+      PYTHONPATH: .
+      # Обов'язкові поля налаштувань; тести до цих сервісів не звертаються.
+      GEMINI_API_KEY: x
+      MONGO_URI: mongodb://127.0.0.1:1
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends antiword
+      - run: uv sync --frozen
+      # Лише помилки, що ламають запуск: невідомі імена, синтаксис, зайві імпорти.
+      - run: uvx ruff check . --select E9,F
+      - name: Tests (including Qdrant isolation tests on the disposable service)
+        run: uv run pytest -q tests
+      - name: Migrations up, down and up again
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
+  bot:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bot
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv sync --frozen
+      - run: uvx ruff check . --select E9,F
+      - run: uv run pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: backend/Dockerfile
+      - uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: bot/Dockerfile
+      - name: Compose file resolves
+        env:
+          BOT_TOKEN: x
+          GEMINI_API_KEY: x
+          GOOGLE_DRIVE_CREDENTIALS_JSON: x
+          INTERNAL_API_TOKEN: x
+          MCP_PUBLIC_URL: https://example.org
+          MONGO_URI: mongodb://example.org
+          NOTION_TOKEN: x
+          POSTGRES_PASSWORD: x
+          R2_ACCOUNT_ID: x
+          R2_ACCESS_KEY_ID: x
+          R2_SECRET_ACCESS_KEY: x
+        run: docker compose config -q

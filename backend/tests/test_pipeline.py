@@ -50,6 +50,10 @@ def f(fid, path="", mime=PDF, drive=None):
 @pytest.fixture(autouse=True)
 def general_drive(monkeypatch):
     monkeypatch.setattr(settings, "GOOGLE_DRIVE_GENERAL_ID", MEMBERS)
+    # справжні диски з локального .env не мають потрапляти в тести
+    monkeypatch.setattr(settings, "GOOGLE_DRIVE_IDS", "")
+    monkeypatch.setattr(settings, "GOOGLE_DRIVE_PAUSED_IDS", "")
+    monkeypatch.setattr(settings, "GOOGLE_DRIVE_GENERAL_FOREIGN", "")
 
 
 @pytest.fixture

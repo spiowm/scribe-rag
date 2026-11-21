@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     R2_BUCKET: str = "scribe-rag"
 
     NOTION_TOKEN: str = ""
-    NOTION_USERS_DB_ID: str = ""
     # Бази Notion, що індексуються табличними документами: id бази (з її
     # посилання) через кому, за потреби з relation-властивістю розбиття після
     # двокрапки: `817b…:Події` — частина на кожну подію. Порожньо — бази не

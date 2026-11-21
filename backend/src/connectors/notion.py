@@ -13,12 +13,11 @@ ROOT_TITLES = {"Home", "Без назви", ""}
 
 
 class NotionConnector:
-    def __init__(self, token: str, users_db_id: str):
+    def __init__(self, token: str):
         self.notion = AsyncClient(
             auth=token,
             log_level=logging.DEBUG,
         )
-        self.users_db_id = users_db_id
         self._raw: dict[str, dict] = {}  # id -> сира сторінка з API
         self._block_parents: dict[str, dict] = {}  # id блока -> його parent
 

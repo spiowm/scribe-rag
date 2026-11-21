@@ -44,6 +44,16 @@ Use the optional backend variable `ORG_CONTEXT` for background and terminology s
 
 In Coolify's Normal view, enter the value as UTF-8 text, select **Multiline**, enable **Runtime** and disable **Build time**. A blank value uses the shared prompt on its own. After recreating the backend, verify the line breaks in the container without printing the value in logs. [Coolify environment variables](https://coolify.io/docs/applications/configuration/environment-variables)
 
+### Scheduled sync
+
+Sync is incremental: it extracts changed files and embeds only changed documents. [`sync_all.py`](../backend/scripts/sync_all.py) syncs Notion and Drive and then refreshes drive permissions through the backend's internal API. Add it in Coolify under **Scheduled Tasks**, select the `backend` container and use this command:
+
+```bash
+uv run --no-dev python scripts/sync_all.py
+```
+
+Scheduled tasks use the server timezone. For example, `0 1 * * *` runs at 01:00 server time. A failed step makes the task exit with code 1. Use **Execute Now** once to check the command and container. [Coolify cron syntax](https://coolify.io/docs/core/automation/cron-syntax)
+
 ## Sign in to agy
 
 The [backend entrypoint](../backend/docker/entrypoint.sh) starts D-Bus and gnome-keyring. The keyring lives in the agy home volume. Stop the backend before starting the interactive container so a single keyring daemon can access the volume during sign-in.

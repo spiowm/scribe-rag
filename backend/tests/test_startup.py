@@ -13,6 +13,9 @@ async def start():
 
 
 def test_backend_without_secrets_fails_before_connectors(monkeypatch):
+    # решта секретів задана, щоб результат не залежав від оточення
+    for name in main.BACKEND_SECRETS:
+        monkeypatch.setattr(settings, name, "x")
     monkeypatch.setattr(settings, "NOTION_TOKEN", "")
     monkeypatch.setattr(settings, "R2_SECRET_ACCESS_KEY", "")
     # конектори не створюються: падіння раніше за будь-яке зʼєднання
