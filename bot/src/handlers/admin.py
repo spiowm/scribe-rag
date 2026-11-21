@@ -14,6 +14,17 @@ router = Router()
 MARKS = {1: "👍", -1: "👎"}
 # Скільки символів питання й відповіді лізе в рядок зведення.
 QUESTION_HEAD, ANSWER_HEAD = 70, 90
+# Скільки символів журналу викликів і одного аргумента в ньому.
+CALLS_HEAD, ARG_HEAD = 160, 40
+# Значок і головний аргумент інструмента. Аргумент — за назвою, а не першим:
+# JSONB зберігає ключі за довжиною, і в get_document першим стає `part`.
+TOOLS = {
+    "search_knowledge_base": ("🔎", "query"),
+    "find_person": ("👤", "name"),
+    "find_by_position": ("🏷", "position"),
+    "get_document": ("📄", "source_id"),
+    "query_members": ("📊", None),
+}
 
 
 async def alert(bot: Bot, message: types.Message, reason: str) -> None:
@@ -44,6 +55,30 @@ async def alert(bot: Bot, message: types.Message, reason: str) -> None:
         logger.warning("сповіщення власнику не дійшло", exc_info=True)
 
 
+def render_run(run: dict | None) -> str:
+    """Журнал прогону одним рядком: що кликала модель і скільки це коштувало.
+
+    Повний журнал (аргументи, source_id) — у `messages.run`, тут лише щоб
+    побачити, чи шукала модель узагалі й чим.
+    """
+    if not run:
+        return ""
+    calls = []
+    for call in run.get("calls") or []:
+        args = call.get("args") or {}
+        icon, key = TOOLS.get(call.get("tool"), ("⚙", None))
+        value = args.get(key) if key else " ".join(map(str, args.values()))
+        mark = "↻" if "repeat_of" in call else ("⚠" if "error" in call else "")
+        calls.append(f"{icon}{mark} {str(value or '')[:ARG_HEAD]}".strip())
+    line = " · ".join(calls) or "без інструментів"
+    if len(line) > CALLS_HEAD:
+        line = line[:CALLS_HEAD] + "…"
+    tail = f"{run.get('steps', 0)} кр., {run.get('seconds', 0):.0f} с"
+    if run.get("fallback"):
+        tail += ", fallback"
+    return f"\n<code>{html.escape(line)}</code> — {tail}"
+
+
 def render(data: dict) -> str:
     """Малює зведення. Бекенд віддає лише цифри, вигляд — тут."""
     median = data.get("median_secs")
@@ -58,6 +93,8 @@ def render(data: dict) -> str:
         f"Медіана відповіді: {median:.0f} с" if median else "Медіана відповіді: —",
         f"Оцінки: 👍 {data['likes']} · 👎 {data['dislikes']}",
     ]
+    for key, text in (data.get("problems") or {}).items():
+        lines.insert(1, f"⚠️ <b>{html.escape(key)}</b>: {html.escape(text)}")
     if data["rated"]:
         lines += ["", "<b>Останні оцінки</b>"]
     for row in data["rated"]:
@@ -66,7 +103,10 @@ def render(data: dict) -> str:
         body = row["answer"].replace("\n", " ")
         cut = "…" if len(body) > ANSWER_HEAD else ""
         answer = html.escape(body[:ANSWER_HEAD])
-        lines.append(f"{mark} <b>{question}</b>\n<i>{answer}{cut}</i>")
+        lines.append(
+            f"{mark} <b>{question}</b>\n<i>{answer}{cut}</i>"
+            + render_run(row.get("run"))
+        )
     return "\n".join(lines)
 
 

@@ -10,7 +10,7 @@ from aiogram.types import (
 
 from src.api_client import ApiClient
 from src.config import settings
-from src.handlers import admin, chat, commands, onboarding, rating
+from src.handlers import access, admin, chat, commands, drives, onboarding, rating
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,6 +21,8 @@ dp.include_router(commands.router)
 dp.include_router(onboarding.router)
 dp.include_router(rating.router)
 dp.include_router(admin.router)
+dp.include_router(access.router)
+dp.include_router(drives.router)
 # chat.router останній: у ньому @router.message() ловить усе, що не розібрали вище.
 dp.include_router(chat.router)
 
@@ -31,13 +33,18 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
     menu = [
         BotCommand(command="start", description="Старт"),
         BotCommand(command="new", description="Нова розмова"),
+        BotCommand(command="drives", description="Де шукати"),
         BotCommand(command="mcp_login", description="Код входу для MCP"),
     ]
     await bot.set_my_commands(menu, scope=BotCommandScopeAllPrivateChats())
     if settings.ADMIN_TELEGRAM_ID:
         # Окремою областю, а не в загальному меню: /admin не має світитись усім.
         await bot.set_my_commands(
-            [*menu, BotCommand(command="admin", description="Зведення")],
+            [
+                *menu,
+                BotCommand(command="admin", description="Зведення"),
+                BotCommand(command="access", description="Доступи до дисків"),
+            ],
             scope=BotCommandScopeChat(chat_id=settings.ADMIN_TELEGRAM_ID),
         )
 

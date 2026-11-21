@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ADMIN_TELEGRAM_ID: int | None = None
     # Адреса, яку людина вставляє в Gemini/Claude, — показується разом із кодом.
     MCP_URL: str = "https://mcp.best-lviv.org.ua/mcp"
+    # Той самий секрет, що й у бекенда: без нього бекенд відповість 401.
+    INTERNAL_API_TOKEN: str = ""
 
     @field_validator("ADMIN_TELEGRAM_ID", mode="before")
     @classmethod

@@ -3,6 +3,8 @@ import logging
 
 import httpx
 
+from src.config import settings
+
 from src.schemas import (
     ChatRequest,
     ChatResponse,
@@ -19,6 +21,7 @@ class ApiClient:
         self._client = httpx.AsyncClient(
             base_url=base_url,
             timeout=httpx.Timeout(10.0, read=timeout),
+            headers={"X-Internal-Token": settings.INTERNAL_API_TOKEN},
         )
 
     async def link(
@@ -71,6 +74,42 @@ class ApiClient:
         """Зведення для власника. None — бекенд не визнав цей id адміном."""
         response = await self._client.post(
             "/admin/stats", json={"telegram_id": telegram_id}
+        )
+        if response.status_code == 403:
+            return None
+        response.raise_for_status()
+        return response.json()
+
+    async def admin_call(self, path: str, telegram_id: int, **body) -> dict:
+        """Виклик адмінського API. Помилку бекенда вертає як {"error": detail}."""
+        response = await self._client.post(
+            f"/admin/{path}", json={"telegram_id": telegram_id, **body}
+        )
+        if response.is_error:
+            # 5xx (збій Drive API) теж доходить до власника, а не губиться в лозі
+            try:
+                detail = response.json().get("detail")
+            except ValueError:  # 500 від FastAPI — простий текст
+                detail = None
+            return {"error": detail or str(response.status_code)}
+        return response.json()
+
+    async def drives(self, telegram_id: int) -> dict | None:
+        """Де бот шукає для людини (`drive_view` бекенда). None — номер ще не
+        підтверджено."""
+        response = await self._client.post(
+            "/drives/", json={"telegram_id": telegram_id}
+        )
+        if response.status_code == 403:
+            return None
+        response.raise_for_status()
+        return response.json()
+
+    async def toggle_drive(self, telegram_id: int, drive_id: str) -> dict | None:
+        """Те саме, що `drives`, після перемикання. None — доступу до диска
+        немає (або номер не підтверджено)."""
+        response = await self._client.post(
+            "/drives/toggle", json={"telegram_id": telegram_id, "drive_id": drive_id}
         )
         if response.status_code == 403:
             return None

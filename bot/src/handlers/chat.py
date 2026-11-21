@@ -1,7 +1,6 @@
 import asyncio
 import html
 import logging
-import re
 import time
 
 import httpx
@@ -10,6 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InputRichMessage
 from aiogram.utils.chat_action import ChatActionSender
 
+from src import rich
 from src.api_client import ApiClient
 from src.handlers.admin import alert
 from src.handlers.rating import keyboard
@@ -139,12 +139,9 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
         await message.reply("Спершу підтверди членство — натисни /start")
         return
     logger.info("reply: %d символів, починається з %r", len(reply), reply[:80])
-    # Телеграм відкидає повідомлення цілком, якщо `<details>` приклеєний до
-    # пункту списку чи цитати; порожній рядок перед ним це лікує.
-    markdown = re.sub(r"\n+<details>", "\n\n<details>", reply)
     try:
         await message.reply_rich(
-            rich_message=InputRichMessage(markdown=markdown),
+            rich_message=InputRichMessage(markdown=rich.prepare(reply)),
             reply_markup=keyboard(answer_id) if answer_id else None,
         )
     except TelegramBadRequest:
@@ -152,6 +149,6 @@ async def handle_chat(message: types.Message, api_client: ApiClient, bot: Bot):
         # важливіша за розмітку, тож вона йде голим текстом.
         logger.warning("markdown не розібрався, відповідь іде текстом", exc_info=True)
         await message.reply_rich(
-            rich_message=InputRichMessage(html=html.escape(reply)),
+            rich_message=InputRichMessage(html=rich.plain(reply)),
             reply_markup=keyboard(answer_id) if answer_id else None,
         )
