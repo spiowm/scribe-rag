@@ -40,3 +40,12 @@ def test_partial_match_note_ignores_apostrophe_kind():
         assert _partial_match_note(query, person) is None
     assert _partial_match_note("Марян Прикладяк", person) is None
     assert _partial_match_note("Марʼян Зразокʼюк", person) is not None
+
+
+def test_match_score_ignores_spaces_around_names():
+    from src.connectors.mongo import _match_score
+
+    tokens = ["ярина", "мінчак"]
+    padded = {"first_name": "Ярина", "last_name": "Мінчак "}
+    namesake = {"first_name": "Ростислав", "last_name": "Мінчак"}
+    assert _match_score(padded, tokens) > _match_score(namesake, tokens)
