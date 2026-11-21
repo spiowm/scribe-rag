@@ -3,9 +3,68 @@ from datetime import datetime
 
 from pymongo import AsyncMongoClient
 
+from src.text import LOOKALIKE, any_apostrophe_regex, fold_apostrophes
+
 STATES = ("Active", "Inactive")
 STATUSES = ("Observer", "Baby", "Full", "Alumni")
 POSITION_WORD = re.compile(r"\w+")
+
+
+def _prefix_pattern(token: str) -> dict:
+    """Регулярка «поле починається з token», апостроф у token — будь-який."""
+    return {"$regex": "^" + any_apostrophe_regex(token), "$options": "i"}
+
+
+# `telegram_username` у довіднику — без «@», регістр довільний; на вхід може
+# прийти і `@nick`, і посилання `t.me/nick`.
+TELEGRAM_NICK = re.compile(
+    r"(?:https?://)?(?:www\.)?(?:t|telegram)\.me/+@?([A-Za-z0-9_]{5,32})/?"
+    r"|@?([A-Za-z0-9_]{5,32})",
+    re.IGNORECASE,
+)
+
+# Віце-президентів записують і скорочено (`VP4HR` у `board`, «VP4PR of XIX
+# Board»), і повністю («Vice president for Human Resources of …»). Обидві форми
+# зводяться до скорочення, і в запиті, і в рядку посади.
+VP_AREAS = {
+    "HR": "human resources",
+    "IT": "informational technology|it",
+    "PR": "public relations",
+    "CR": "corporate relations",
+    "DS": "design",
+    "IR": "international relations",
+}
+VP_PATTERNS = {
+    code: rf"\b(?:vice[ -]?president|vp)\s*(?:4|for)\s*(?:{full}|{code})\b"
+    for code, full in VP_AREAS.items()
+}
+
+
+# Римські номери бордів часом набрані з кириличною «І» чи «Х» (`XXIІ`, `XXIІІ`),
+# і латинське `XXII` в запиті їх не знаходило. Схожі літери зводяться до латиниці,
+# лише коли слово після цього — римське число й латиниця в ньому вже є.
+ROMAN = re.compile(r"[ivxlcdm]+")
+
+
+def roman_latin(word: str) -> str:
+    """`xxiі` → `xxii`; решта слів без змін. Слово — уже в нижньому регістрі."""
+    fixed = word.translate(LOOKALIKE)
+    if fixed != word and ROMAN.fullmatch(fixed) and re.search("[a-z]", word):
+        return fixed
+    return word
+
+
+def telegram_nick(text: str) -> str | None:
+    """Нік Telegram із запиту або None, якщо запит на нік не схожий."""
+    m = TELEGRAM_NICK.fullmatch(text.strip())
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def vp_short(text: str) -> str:
+    """«Vice president for IT», «VP for IT» → «VP4IT»."""
+    for code, pattern in VP_PATTERNS.items():
+        text = re.sub(pattern, f"VP4{code}", text, flags=re.IGNORECASE)
+    return text
 
 
 class MongoConnector:
@@ -20,12 +79,22 @@ class MongoConnector:
         return await self._members.find_one({"phone_number": phone})
 
     async def search_members(self, name: str, limit: int = 5) -> list[dict]:
-        """Шукає членів за фрагментом імені. Повертає до limit найкращих збігів"""
+        """Шукає членів за фрагментом імені або за ніком Telegram.
+        Повертає до limit найкращих збігів"""
+
+        if nick := telegram_nick(name):
+            # імена в довіднику майже всі кирилицею, тож латинське слово — це нік
+            exact = {"$regex": f"^{re.escape(nick)}$", "$options": "i"}
+            found = await self._members.find(
+                {"telegram_username": exact}, {"_id": 0}
+            ).to_list(limit)
+            if found:
+                return found
 
         def _match_score(doc: dict, tokens: list[str]) -> int:
             """Наскільки документ відповідає токенам запиту."""
-            last = (doc.get("last_name") or "").lower()
-            first = (doc.get("first_name") or "").lower()
+            last = fold_apostrophes(doc.get("last_name") or "").lower()
+            first = fold_apostrophes(doc.get("first_name") or "").lower()
 
             score = 0
             for token in tokens:
@@ -37,14 +106,15 @@ class MongoConnector:
                     score += 1
             return score
 
-        tokens = [t for t in re.split(r"[\s,]+", name.lower()) if len(t) >= 3]
+        name = fold_apostrophes(name).lower()
+        tokens = [t for t in re.split(r"[\s,]+", name) if len(t) >= 3]
         if not tokens:
             return []
 
         conditions = []
 
         for token in tokens:
-            pattern = {"$regex": f"^{re.escape(token)}", "$options": "i"}
+            pattern = _prefix_pattern(token)
             conditions += [{"last_name": pattern}, {"first_name": pattern}]
 
         docs = [d async for d in self._members.find({"$or": conditions}, {"_id": 0})]
@@ -59,16 +129,18 @@ class MongoConnector:
         а слова: всі слова запиту мають стояти в одному рядку посади.
 
         `board` шукаємо теж — там `VP4HR`, а в посадах те саме
-        записано як «Vice president for Human Resources».
+        записано як «Vice president for Human Resources»: обидві форми
+        зводить до скорочення `vp_short`.
         """
 
         def words(text: str) -> list[str]:
-            return [w.lower() for w in POSITION_WORD.findall(text)]
+            folded = fold_apostrophes(text)
+            return [roman_latin(w.lower()) for w in POSITION_WORD.findall(folded)]
 
         def matched(positions: list[str] | None, wanted: list[str]) -> list[str]:
             hits = []
             for title in positions or []:
-                have = words(title)
+                have = words(title) + words(vp_short(title))
                 # Короткі слова («MO», «PR») — лише повним збігом, інакше «mo»
                 # витягне «Motivation». Довгі — префіксом, щоб «respons»
                 # знаходило «Responsible».
@@ -79,13 +151,19 @@ class MongoConnector:
                     hits.append(title)
             return hits
 
-        wanted = words(position)
+        wanted = words(vp_short(position))
         if not wanted:
             return {"count": 0, "people": []}
 
         # Монго звузить вибірку за найдовшим словом (усі збіги його містять),
         # а точний відбір по всіх словах зробимо вже на кількох документах.
-        longest = {"$regex": re.escape(max(wanted, key=len)), "$options": "i"}
+        # Скорочення `vp4it` в рядку може стояти повною назвою — тоді шаблон.
+        top = max(wanted, key=len)
+        pattern = VP_PATTERNS.get(top[3:].upper()) if top.startswith("vp4") else None
+        if not pattern and ROMAN.fullmatch(top):
+            # у базі той самий номер може стояти з кириличною «І» чи «Х»
+            pattern = "".join({"i": "[iі]", "x": "[xх]"}.get(c, c) for c in top)
+        longest = {"$regex": pattern or re.escape(top), "$options": "i"}
 
         people = []
         async for doc in self._members.find(
@@ -138,7 +216,7 @@ class MongoConnector:
             return (
                 not (role and words(role) == wanted),
                 not (person.get("matched_current") or role),
-                not any(words(t)[:1] == wanted[:1] for t in titles),
+                not any(words(vp_short(t))[:1] == wanted[:1] for t in titles),
             )
 
         people.sort(key=rank)
@@ -172,12 +250,13 @@ class MongoConnector:
         if mentor:
             # Поле завжди канонічне «Імʼя Прізвище», а на вхід може прийти
             # прізвище, зворотний порядок або прізвисько з мінетсів.
-            tokens = {t for t in re.split(r"[\s,]+", mentor.lower()) if len(t) >= 3}
+            folded = fold_apostrophes(mentor).lower()
+            tokens = {t for t in re.split(r"[\s,]+", folded) if len(t) >= 3}
             rows = [
                 (
                     f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
-                    (c.get("last_name") or "").lower(),
-                    (c.get("first_name") or "").lower(),
+                    fold_apostrophes(c.get("last_name") or "").lower(),
+                    fold_apostrophes(c.get("first_name") or "").lower(),
                 )
                 for c in await self.search_members(mentor, limit=5)
             ]
@@ -199,7 +278,7 @@ class MongoConnector:
             if not actual:
                 return {"count": 0, "mentor_not_found": mentor}
             if len(actual) > 1:
-                # «Панчук» це і Павло, і Тетяна — вгадувати не можна
+                # одне прізвище буває в кількох менторів, вгадувати не можна
                 return {"ambiguous_mentor": actual}
             mentor_resolved = actual[0]
             query["mentor_name"] = mentor_resolved
@@ -269,6 +348,15 @@ class MongoConnector:
                 )
             ]
         return result
+
+    async def emails(self) -> set[str]:
+        """Усі пошти довідника, нормалізовані так само, як у доступах."""
+        docs = await self._members.find({}, {"email": 1}).to_list(None)
+        return {
+            d["email"].strip().lower()
+            for d in docs
+            if isinstance(d.get("email"), str) and d["email"].strip()
+        }
 
     async def close(self) -> None:
         await self._client.close()
