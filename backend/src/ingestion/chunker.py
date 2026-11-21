@@ -112,6 +112,11 @@ def question_starts(text: str) -> set[int]:
     return questions - answers
 
 
+SHEET = "## Аркуш"  # початок аркуша в тексті таблиці (`sheets.HEAD`)
+# Фрагмент таблиці: опис зазвичай 260 токенів (90% — до 700), тож 2000 лишає
+# цілим майже все. Межа ембедингу gemini-embedding-2 — 8192, довше обрізається мовчки.
+TABLE_CHUNK = 2000
+
 # Бюджет фрагмента таблиці, що йде у вектор цілою: шапка + цілі рядки. Запис
 # Бази подій — 100–700 символів, тож у фрагменті одна-дві події, а не пів десятка.
 ROWS_BUDGET = 800
@@ -139,7 +144,9 @@ class Chunker:
             node.excluded_embed_metadata_keys.append("scope")
         return nodes
 
-    def _split(self, text: str, fields: dict) -> list[TextNode]:
+    def _split(
+        self, text: str, fields: dict, parser: SentenceSplitter | None = None
+    ) -> list[TextNode]:
         doc = Document(text=text, metadata=fields)
         doc.excluded_embed_metadata_keys = [
             "source",
@@ -149,7 +156,7 @@ class Chunker:
         ]
         return [
             node
-            for node in self.parser.get_nodes_from_documents([doc])
+            for node in (parser or self.parser).get_nodes_from_documents([doc])
             if isinstance(node, TextNode)
         ]
 
@@ -183,6 +190,62 @@ class Chunker:
                     groups.append([a, b])
             for a, b in groups:
                 nodes += self._split(text[a:b], meta)
+        return nodes
+
+    def chunk_table(
+        self, text: str, metadata: ChunkMetadata, size: int = TABLE_CHUNK
+    ) -> list[TextNode]:
+        """Таблиця Drive (опис або ціла мала) — один фрагмент, а більша — за аркушами.
+
+        SentenceSplitter на 800 токенів різав 10% описів посеред переліку колонок
+        і малі таблиці посеред запису, а два фрагменти однієї таблиці займали два
+        місця в топ-25. Тут фрагмент — рядок «Таблиця «…»» (якщо є) і цілі аркуші,
+        поки влазять у `size`; завеликий аркуш — його шапка й цілі рядки.
+        """
+        if not text or not text.strip():
+            return []
+        fields = metadata.model_dump()
+        scope = fields.pop("scope")
+        parser = SentenceSplitter(chunk_size=size, chunk_overlap=100)
+        budget = size - ntok(
+            parser._get_metadata_str(Document(text="", metadata=fields))
+        )
+        lines = text.strip().split("\n")
+        prefix = [] if lines[0].startswith(SHEET) else [lines.pop(0)]
+        sheets: list[list[str]] = []
+        for line in lines:
+            if line.startswith(SHEET) or not sheets:
+                sheets.append([])
+            sheets[-1].append(line)
+
+        def fits(part: list[str]) -> bool:
+            return ntok("\n".join(part)) <= budget
+
+        units: list[list[str]] = []  # аркуш цілим або шапка аркуша + цілі рядки
+        for sheet in sheets:
+            if fits(prefix + sheet):
+                units.append(sheet)
+                continue
+            head, rows = sheet[0], sheet[1:]
+            units.append([head])
+            for row in rows:
+                if len(units[-1]) > 1 and not fits(prefix + units[-1] + [row]):
+                    units.append([head])
+                units[-1].append(row)
+        parts: list[list[str]] = []
+        for unit in units:
+            if parts and fits(prefix + parts[-1] + unit):
+                parts[-1] += unit
+            else:
+                parts.append(list(unit))
+        nodes = [
+            node
+            for part in parts
+            for node in self._split("\n".join(prefix + part), fields, parser)
+        ]
+        for node in nodes:
+            node.metadata["scope"] = scope
+            node.excluded_embed_metadata_keys.append("scope")
         return nodes
 
     def chunk_rows(

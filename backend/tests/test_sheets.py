@@ -63,3 +63,97 @@ def test_summary_only_for_big_tables():
     assert named is not None and named.startswith(
         "Таблиця «Бюджет» · Courses/[2021] Summer/Бюджети. Повний вміст"
     )
+
+
+def colored_book(fill_cells: dict[str, str], values: dict, merge=()):
+    from openpyxl.styles import PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "План"
+    for ref, v in values.items():
+        ws[ref] = v
+    for ref, color in fill_cells.items():
+        ws[ref].fill = PatternFill("solid", fgColor=color)
+    for rng in merge:
+        ws.merge_cells(rng)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_gantt_bar_becomes_dates():
+    orange, head = "FFFF9900", "FFB6D7A8"
+    values = {"A1": "Задачі", "A3": "Контент план", "A4": "Брошура", "A5": "Фото"}
+    fills = {}
+    for i, col in enumerate("BCDEF"):
+        values[f"{col}1"] = ["пн", "вт", "ср", "чт", "пт"][i]
+        values[f"{col}2"] = f"{13 + i}.05"
+        fills[f"{col}1"] = fills[f"{col}2"] = head
+    fills |= {"B3": orange, "C3": orange, "D3": orange, "F4": orange}
+    text, _ = sheet_text(colored_book(fills, values))
+    colored = text.split("Позначено кольором клітинок:\n")[1].splitlines()
+    assert colored == ["Контент план — 13.05 – 15.05", "Брошура — 17.05"]
+
+
+def test_calendar_day_takes_legend_by_color():
+    green, red = "FF6AA84F", "FFFF0000"
+    values = {"A1": "Грудень'26", "A2": "ПН", "B2": "ВТ", "C2": "СР"}
+    values |= {"A3": 7, "B3": 8, "C3": 9, "A4": 14, "B4": 15, "C4": 16}
+    values |= {"A6": "Вибори MO BCI", "A7": "Різдвяна вечірка"}
+    fills = {"C3": green, "A6": green, "B4": red, "C4": red, "A7": red}
+    text, _ = sheet_text(colored_book(fills, values, merge=["A1:C1"]))
+    assert "Вибори MO BCI — Грудень'26 9" in text
+    assert "Різдвяна вечірка — Грудень'26 15–16" in text
+
+
+def test_colors_without_dates_add_nothing():
+    yellow = "FFFFFF00"
+    values = {"A1": "Товар", "B1": "Ціна", "C1": "Разом"}
+    values |= {"A2": "худі", "B2": 450, "A3": "Загальна вартість", "C3": 763.5}
+    fills = {"A3": yellow, "B3": yellow, "C3": yellow, "B2": yellow}
+    text, _ = sheet_text(colored_book(fills, values))
+    assert "кольором" not in text
+
+
+def _meta(title="План.xlsx"):
+    from src.ingestion.schemas import ChunkMetadata
+
+    return ChunkMetadata(
+        source="gdrive", source_id="x", title=title, url="u",
+        last_edited="t", path="Диск/Тека", scope="general",
+    )  # fmt: skip
+
+
+def test_table_is_one_fragment_when_it_fits():
+    from src.ingestion.chunker import Chunker
+
+    sheets = "\n\n".join(
+        f"## Аркуш «{i}» · рядків: 1 · колонки: А, Б\nрядок {i} — А: {'x' * 300}"
+        for i in range(6)
+    )
+    text = "Таблиця «План» · Диск/Тека. Повний вміст — get_document.\n" + sheets
+    nodes = Chunker().chunk_table(text, _meta())
+    assert len(nodes) == 1 and nodes[0].text == text.strip()
+    assert nodes[0].metadata["scope"] == "general"
+
+
+def test_big_table_splits_on_sheets_with_title_in_each():
+    from src.ingestion.chunker import Chunker
+
+    head = "Таблиця «План» · Диск/Тека. Повний вміст — get_document."
+    sheets = [
+        f"## Аркуш «{i}» · рядків: 3 · колонки: А\n"
+        + "\n".join(f"запис {i}.{j} — А: {'слово ' * 60}" for j in range(3))
+        for i in range(8)
+    ]
+    nodes = Chunker().chunk_table(head + "\n" + "\n".join(sheets), _meta(), size=400)
+    assert len(nodes) > 1
+    for node in nodes:
+        assert node.text.startswith(head + "\n## Аркуш «")
+        # запис не розрізано: кожен рядок тексту — цілий рядок таблиці
+        assert all(
+            line == head or line.startswith(("## Аркуш", "запис "))
+            for line in node.text.split("\n")
+        )
