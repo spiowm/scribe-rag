@@ -8,9 +8,18 @@ from mcp.server.lowlevel.server import Server
 
 from src.config import settings
 from src.db import async_session_maker
-from src.generation.prompts import MCP_ABOUT, MCP_INSTRUCTIONS, MCP_SEARCH_RULES
+from src.generation.prompts import (
+    MCP_ABOUT,
+    MCP_INSTRUCTIONS,
+    MCP_SEARCH_RULES,
+    drive_context,
+    user_context,
+)
 from src.generation.tools import TOOLS, Limits
+from src.ingestion.schemas import GENERAL
 from src.models.mcp_call import McpCall
+from src.models.user import User
+from src.repository import access
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +50,39 @@ async def list_tools(_ctx, _params) -> types.ListToolsResult:
                     annotations=types.ToolAnnotations(read_only_hint=True),
                 )
             )
+    tools.append(WHO_AM_I)
     return types.ListToolsResult(tools=tools)
+
+
+# Лише для MCP (M8): бот кладе картку співрозмовника в системний промпт, а
+# веб-чат її не має, і «хто мій ангел» там не працював. Боту ж інструмент
+# коштував би опису в кожному запиті без жодної користі.
+WHO_AM_I = types.Tool(
+    name="who_am_i",
+    title="Хто я",
+    description=(
+        "Картка співрозмовника з довідника: імʼя, статус, посади, група "
+        "менторства, ментор, дата вступу. Використовуй для запитів про себе, "
+        "доступ до дисків у search_knowledge_base або звертання на імʼя. "
+        "Аргументів не має."
+    ),
+    input_schema={"type": "object", "properties": {}},
+    annotations=types.ToolAnnotations(read_only_hint=True),
+)
 
 
 def _attrs(**values) -> str:
     return " ".join(
         f'{k}="{html.escape(str(v), quote=True)}"' for k, v in values.items() if v
     )
+
+
+def _fragment(item: dict) -> str:
+    # Назва розділу мінетсів — рядком над текстом: сам фрагмент її здебільшого
+    # не містить, а без неї не видно, чиї це вибори чи звітність.
+    if item.get("section"):
+        return f"[розділ: {item['section']}]\n{item['text']}"
+    return item["text"]
 
 
 def search_as_text(results: list[dict]) -> str:
@@ -72,7 +107,7 @@ def search_as_text(results: list[dict]) -> str:
             source_id=source_id,
         )
         # Фрагменти одного документа не обовʼязково сусідні — розрив позначено.
-        body = "\n\n[…]\n\n".join(item["text"] for item in items)
+        body = "\n\n[…]\n\n".join(_fragment(item) for item in items)
         blocks.append(f"<document {head}>\n{body}\n</document>")
     return "\n\n".join(blocks)
 
@@ -121,13 +156,42 @@ async def save_call(
         logger.exception("mcp_calls: виклик %s не записано", tool)
 
 
+async def caller(ctx) -> tuple[dict | None, list[str]]:
+    """Те саме, що в боті: користувач токена → запис довідника й доступи."""
+    user_id = int(ctx.request.user.access_token.subject)
+    async with async_session_maker() as db:
+        user = await db.get(User, user_id)
+        if user is None:
+            return None, [GENERAL]
+        return await access.caller(db, ctx.request.app.state.mongo, user)
+
+
+async def who_am_i(ctx) -> str:
+    """Картка людини й її диски — те саме, що бот кладе в системний промпт."""
+    user_id = int(ctx.request.user.access_token.subject)
+    async with async_session_maker() as db:
+        user = await db.get(User, user_id)
+        member = None
+        if user is not None:
+            member, _ = await access.caller(db, ctx.request.app.state.mongo, user)
+        drives = await access.drive_facts(db, user_id, member, settings.GOOGLE_DRIVES)
+    return f"{user_context(member)}\n\n{drive_context(drives)}"
+
+
 async def call_tool(ctx, params) -> types.CallToolResult:
+    if params.name == WHO_AM_I.name:
+        started = time.monotonic()
+        text = await who_am_i(ctx)
+        ms = round((time.monotonic() - started) * 1000)
+        await save_call(ctx, params.name, {}, {}, text, ms)
+        return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
     spec = TOOLS[params.name]
     deps = ctx.request.app.state
     args = params.arguments or {}
     started = time.monotonic()
     try:
-        result = await spec.run(deps, args, LIMITS)
+        _, scopes = await caller(ctx)
+        result = await spec.run(deps, args, LIMITS, scopes)
     except Exception as exc:
         # Клієнту помилку віддасть SDK, а в журнал вона йде тут.
         ms = round((time.monotonic() - started) * 1000)

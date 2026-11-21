@@ -1,6 +1,8 @@
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends, Request
+import hmac
+
+from fastapi import Depends, Header, Request
 from google import genai
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
@@ -15,6 +17,13 @@ from src.models.user import User
 from src.repository import users
 from src.vectorstore.memes import MemeRepository
 from src.vectorstore.qdrant import QdrantRepository
+
+
+def internal_only(x_internal_token: str = Header(default="")) -> None:
+    """Заголовок `X-Internal-Token` = `INTERNAL_API_TOKEN`, якщо той заданий."""
+    expected = settings.INTERNAL_API_TOKEN
+    if expected and not hmac.compare_digest(x_internal_token, expected):
+        raise HTTPException(401, "bad_internal_token")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

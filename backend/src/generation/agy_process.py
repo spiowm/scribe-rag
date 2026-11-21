@@ -8,6 +8,10 @@ class AgyError(Exception):
     """Будь-який збій agy: не стартував, упав, тайм-аут, помилка у відповіді."""
 
 
+class AgyProviderError(AgyError):
+    """Помилка з текстом із процесу agy, який може повторювати введені дані."""
+
+
 class AgyProcess:
     def __init__(
         self,
@@ -57,7 +61,9 @@ class AgyProcess:
                 # Порожньо — значить agy закрив вихід, тобто процес завершився.
                 # Причину він пише в окремий канал помилок, stderr.
                 stderr = (await proc.stderr.read()).decode(errors="replace")
-                raise AgyError(f"agy finished unexpectedly. stderr: {stderr[-500:]}")
+                raise AgyProviderError(
+                    f"agy finished unexpectedly. stderr: {stderr[-500:]}"
+                )
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
@@ -100,7 +106,12 @@ class AgyProcess:
 
         event = await self._read_event(timeout=30)
         if event.get("event") != "init":
-            raise AgyError(f"очікував init, отримав {event.get('event')}")
+            # Незалогінений agy одразу шле result з причиною в `error`
+            # («authentication failed or timed out»); без неї збій безіменний.
+            result = event.get("result")
+            error = result.get("error") if isinstance(result, dict) else None
+            detail = f": {error}" if error else ""
+            raise AgyError(f"очікував init, отримав {event.get('event')}{detail}")
 
         new_id = event.get("conversation_id")
         if not new_id:
@@ -127,7 +138,9 @@ class AgyProcess:
                 continue
             result = event["result"]
             if result.get("status") != "SUCCESS":
-                raise AgyError(result.get("error") or f"status {result.get('status')}")
+                raise AgyProviderError(
+                    result.get("error") or f"status {result.get('status')}"
+                )
 
             usage = result.get("usage") or {}
             keys = ("input_tokens", "cache_read_tokens", "output_tokens")

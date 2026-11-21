@@ -5,11 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db, get_mongo, get_user
 from src.api.schemas import LinkRequest, LoginCodeResponse, UserResponse
-from src.repository import login_codes, users
 from src.connectors.mongo import MongoConnector
 from src.models.user import User
-from src.repository import users
-
+from src.repository import login_codes, users
 
 router = APIRouter(
     prefix="/auth",

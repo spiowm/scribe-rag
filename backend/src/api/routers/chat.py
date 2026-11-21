@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db, get_memes, get_rag_chain, get_user
 from src.api.schemas import ChatRequest, ChatResponse, RateRequest
-from src.generation.chain import LAST_RUN, RagChain
+from src.config import settings
+from src.generation.chain import LAST_RUN, RagChain, run_record
+from src.generation.prompts import drive_context
+from src.generation.sources import tag_sources
 from src.generation.tools import TOOLS
 from src.models.user import User
-from src.repository import chats
+from src.repository import access, chats
 from src.vectorstore.memes import MemeRepository
 
 router = APIRouter(
@@ -96,8 +99,15 @@ async def process_message_stream(
 ):
     """Те саме, що /chat/, але статуси йдуть одразу, а відповідь — у кінці."""
     take_slot(user.id)
-    session = await chats.get_or_create_session(db, user.id)
-    window = await chats.get_history_window(db, session.id)
+    try:
+        session = await chats.get_or_create_session(db, user.id)
+        window = await chats.get_history_window(db, session.id)
+        member, scopes = await access.caller(db, chain.mongo, user)
+        drives = await access.drive_facts(db, user.id, member, settings.GOOGLE_DRIVES)
+    except BaseException:
+        # стрім іще не почався, тож його finally слот не звільнить
+        free_slot(user.id)
+        raise
 
     events: asyncio.Queue[str] = asyncio.Queue()
     started = time.monotonic()
@@ -106,8 +116,10 @@ async def process_message_stream(
         reply = await chain.generate_reply(
             request.message,
             window.messages,
-            user.phone_number,
+            member,
+            scopes,
             on_event=events.put_nowait,
+            drives=drive_context(drives),
         )
         return reply, LAST_RUN.get() or {}
 
@@ -135,7 +147,12 @@ async def process_message_stream(
                 reply, info = task.result()
                 seconds = time.monotonic() - started
                 await chats.add_message(db, session.id, "user", request.message)
-                answer = await chats.add_message(db, session.id, "assistant", reply)
+                # У БД — без позначок: історія йде назад у модель, і вона
+                # почала б писати їх сама.
+                answer = await chats.add_message(
+                    db, session.id, "assistant", reply, run_record(info, seconds)
+                )
+                shown = await tag_sources(db, reply, drives)
                 yield (
                     json.dumps(
                         {
@@ -143,7 +160,7 @@ async def process_message_stream(
                             # id потрібен боту, щоб кнопки оцінки знали, що оцінюють
                             "message_id": answer.id,
                             "text": build_tools_block(info)
-                            + reply
+                            + shown
                             + build_footer(info, seconds, window),
                         }
                     )
@@ -171,18 +188,26 @@ async def process_message(
         session = await chats.get_or_create_session(db, user.id)
         window = await chats.get_history_window(db, session.id)
 
+        member, scopes = await access.caller(db, chain.mongo, user)
+        drives = await access.drive_facts(db, user.id, member, settings.GOOGLE_DRIVES)
         started = time.monotonic()
         reply = await chain.generate_reply(
-            request.message, window.messages, user.phone_number
+            request.message,
+            window.messages,
+            member,
+            scopes,
+            drives=drive_context(drives),
         )
         seconds = time.monotonic() - started
 
-        await chats.add_message(db, session.id, "user", request.message)
-        await chats.add_message(db, session.id, "assistant", reply)
-
         run = LAST_RUN.get() or {}
+        await chats.add_message(db, session.id, "user", request.message)
+        await chats.add_message(
+            db, session.id, "assistant", reply, run_record(run, seconds)
+        )
+        shown = await tag_sources(db, reply, drives)
         return ChatResponse(
-            reply=build_tools_block(run) + reply + build_footer(run, seconds, window)
+            reply=build_tools_block(run) + shown + build_footer(run, seconds, window)
         )
     finally:
         free_slot(user.id)
