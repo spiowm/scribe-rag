@@ -21,7 +21,11 @@ def fold_apostrophes(text: str) -> str:
     return _APOSTROPHE.sub("'", text)
 
 
-def any_apostrophe_regex(text: str) -> str:
-    """Регулярка для `text`, де апостроф — будь-який."""
-    parts = (re.escape(p) for p in fold_apostrophes(text).split("'"))
-    return f"[{APOSTROPHES}]".join(parts)
+def drop_apostrophes(text: str) -> str:
+    """Без апострофів: імена пишуть і «Дар'я», і «Даря»."""
+    return _APOSTROPHE.sub("", text)
+
+
+def optional_apostrophe_regex(text: str) -> str:
+    """Регулярка для `text`, де між літерами може стояти будь-який апостроф або жодного."""
+    return f"[{APOSTROPHES}]?".join(re.escape(c) for c in drop_apostrophes(text))
