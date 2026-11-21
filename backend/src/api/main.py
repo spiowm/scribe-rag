@@ -38,10 +38,7 @@ async def lifespan(app: FastAPI):
     if missing:
         raise RuntimeError(f"Backend не стартує: не задано {', '.join(missing)}")
 
-    app.state.notion = NotionConnector(
-        settings.NOTION_TOKEN,
-        settings.NOTION_USERS_DB_ID,
-    )
+    app.state.notion = NotionConnector(settings.NOTION_TOKEN)
 
     embedding_model = GoogleGenAIEmbedding(
         model_name=settings.GEMINI_EMBEDDING_MODEL,
