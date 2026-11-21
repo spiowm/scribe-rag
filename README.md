@@ -6,8 +6,6 @@
 
 <p align="center">A Telegram assistant that answers questions from BEST Lviv members and links to its sources in Notion and Google Drive. Also available via MCP.</p>
 
-<p align="center"><a href="backend/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.12%2B-3776AB" alt="Python 3.12 or newer"></a></p>
-
 <p align="center"><a href="#demo">Demo</a> · <a href="#architecture">Architecture</a> · <a href="#setup">Setup</a></p>
 
 ## Demo
@@ -29,13 +27,22 @@ Excerpt from a Scribe conversation in Telegram showing the public event links in
 
 ```mermaid
 flowchart TD
-    N[Notion and Google Drive] --> I[Extract, chunk and embed]
-    I --> Q[(Qdrant index)]
-    C[Telegram and MCP] --> Q
-    C --> U[(MongoDB directory)]
+    T[Telegram user] --> B[Telegram bot]
+    B --> A[FastAPI backend]
+    D[Notion and Drive] -->|Document sync| A
+    C[MCP client] --> M[MCP service]
+
+    A --> Q[(Qdrant)]
+    A --> P[(PostgreSQL)]
+    A --> U[(MongoDB)]
+    M --> Q
+    M --> P
+    M --> U
 ```
 
-The Telegram bot streams answers from the FastAPI backend. The OAuth-protected MCP service exposes search and directory tools so a connected client can retrieve the same source links. PostgreSQL stores user and chat state, OAuth data and extracted documents. MongoDB serves directory lookups independently of the document index.
+The Telegram bot streams answers from the FastAPI backend. MCP clients connect directly to the OAuth-protected MCP service for search, document reads and directory lookups.
+
+During sync, the backend extracts and chunks content from Notion and Google Drive, embeds the chunks and indexes them in Qdrant. PostgreSQL stores extracted documents for both services to read, plus Telegram chat history, linked user accounts and MCP OAuth data. Both services use MongoDB for read-only member lookups.
 
 - **Rare names.** A single query embedding drives semantic search and extra queries filtered to individual rare names. Each filter gives matching chunks their own candidate pool before the backend deduplicates and ranks them. [Search implementation](backend/src/vectorstore/qdrant.py#L41-L87)
 - **Index updates.** A sync copies unchanged points into a new collection and embeds changed chunks. The live search alias switches after the replacement collection is populated and passes a size check. [Reindexing](backend/src/vectorstore/qdrant.py#L136-L156) · [Alias switch](backend/src/vectorstore/qdrant.py#L188-L198)
