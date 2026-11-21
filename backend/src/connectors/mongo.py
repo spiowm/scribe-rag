@@ -20,6 +20,26 @@ def _prefix_pattern(token: str) -> dict:
     return {"$regex": "^" + optional_apostrophe_regex(token), "$options": "i"}
 
 
+def _name_part(doc: dict, field: str) -> str:
+    """Імʼя чи прізвище для порівняння: у довіднику трапляється «Мінчак »."""
+    return drop_apostrophes(doc.get(field) or "").strip().lower()
+
+
+def _match_score(doc: dict, tokens: list[str]) -> int:
+    """Наскільки документ відповідає токенам запиту."""
+    last = _name_part(doc, "last_name")
+    first = _name_part(doc, "first_name")
+    score = 0
+    for token in tokens:
+        if last == token:
+            score += 2
+        elif last.startswith(token):
+            score += 1
+        if first == token or first.startswith(token):
+            score += 1
+    return score
+
+
 # `telegram_username` у довіднику — без «@», регістр довільний; на вхід може
 # прийти і `@nick`, і посилання `t.me/nick`.
 TELEGRAM_NICK = re.compile(
@@ -95,21 +115,6 @@ class MongoConnector:
             ).to_list(limit)
             if found:
                 return found
-
-        def _match_score(doc: dict, tokens: list[str]) -> int:
-            """Наскільки документ відповідає токенам запиту."""
-            last = drop_apostrophes(doc.get("last_name") or "").lower()
-            first = drop_apostrophes(doc.get("first_name") or "").lower()
-
-            score = 0
-            for token in tokens:
-                if last == token:
-                    score += 2
-                elif last.startswith(token):
-                    score += 1
-                if first == token or first.startswith(token):
-                    score += 1
-            return score
 
         name = drop_apostrophes(name).lower()
         tokens = [t for t in re.split(r"[\s,]+", name) if len(t) >= 3]
@@ -259,9 +264,11 @@ class MongoConnector:
             tokens = {t for t in re.split(r"[\s,]+", folded) if len(t) >= 3}
             rows = [
                 (
-                    f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
-                    drop_apostrophes(c.get("last_name") or "").lower(),
-                    drop_apostrophes(c.get("first_name") or "").lower(),
+                    " ".join(
+                        f"{c.get('first_name') or ''} {c.get('last_name') or ''}".split()
+                    ),
+                    _name_part(c, "last_name"),
+                    _name_part(c, "first_name"),
                 )
                 for c in await self.search_members(mentor, limit=5)
             ]
