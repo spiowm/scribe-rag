@@ -10,6 +10,7 @@ from google.genai import types
 from src.connectors.mongo import MongoConnector
 from src.db import async_session_maker
 from src.repository import documents
+from src.text import fold_apostrophes
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
@@ -20,13 +21,11 @@ SEARCH_TOOL = types.Tool(
         types.FunctionDeclaration(
             name="search_knowledge_base",
             description=(
-                "Шукає у базі знань BEST Lviv. Два джерела в одному індексі:\n"
+                "Шукає в базі знань організації. Два джерела в одному індексі:\n"
                 "• **Notion** — сторінки про процеси, івенти, ролі, історію та традиції "
                 "осередку, хендбуки по відділах, «як робити X» від попередників.\n"
-                "• **Google Drive** — офіційні документи й архіви: статут, внутрішні "
-                "правила, Code of Conduct, КСПЗ, LTSP, річні плани (AAP) і звіти "
-                "(AAR, SAAR), мінетси зборів і виборів, мотиваційні листи та екшн-плани "
-                "конкретних людей, міжнародні пропоузали, матеріали тренінгів (BKT, SIT).\n"
+                "• **Google Drive** — документи й архіви: статут, внутрішні правила, "
+                "плани, звіти, протоколи зборів, матеріали подій і тренінгів.\n"
                 "Тобто в базі є і «як у нас прийнято», і «що записано в документі», "
                 "і «що саме вирішили на тих зборах».\n"
                 "Про конкретну людину тут лежить те, чого немає в картці: що вона "
@@ -34,8 +33,8 @@ SEARCH_TOOL = types.Tool(
                 "посади — бери з find_person, а на розгорнуте питання про людину клич "
                 "обидва інструменти одним кроком.\n"
                 "Викликай не лише тоді, коли потрібні факти, а й коли готуєш ідеї, "
-                "план, аналіз чи пораду: щоб спиратись на те, як усе влаштовано саме "
-                "в BEST, а не на загальні уявлення. Для ідей шукай схожі івенти й "
+                "план, аналіз чи пораду, щоб спиратись на досвід організації. "
+                "Для ідей шукай схожі івенти й "
                 "наявні напрацювання, для аналізу — як цей процес описаний у нас.\n"
                 "У кожного фрагмента є `url`: на ці сторінки й посилайся у відповіді."
             ),
@@ -53,8 +52,7 @@ SEARCH_TOOL = types.Tool(
                             "Власні назви з питання, які мусять бути у фрагменті "
                             "дослівно: назви формувань і команд, івенти з номером, "
                             "хвилі набору, прізвища, прізвиська, назви документів. "
-                            "Наприклад: SoDeep, ІЯК17, осінь14, Мінчак, бірко, "
-                            "BEST::HACKath0n.\n"
+                            "Наприклад: Команда Орбіта, Ярмарок’24, весна’26.\n"
                             "Навіщо: пошук по змісту такі слова знаходить погано — "
                             "вони нічого не означають, а лише вказують на щось "
                             "конкретне. Якщо в питанні є така назва і ти не передаш "
@@ -78,10 +76,8 @@ QUERY_MEMBERS_TOOL = types.Tool(
         types.FunctionDeclaration(
             name="query_members",
             description=(
-                "Рахує й перелічує членів осередку за довідником. Єдине джерело "
-                "чисел про склад: у текстах їх немає, тому пошук їх не знайде — "
-                "заміряно, що на «скільки фулів», «скільки активних», «скільки "
-                "алюмні» без цієї тулзи відповіді були неправильні або відмовні.\n"
+                "Рахує й перелічує членів за довідником. Використовуй як джерело "
+                "чисел про склад організації.\n"
                 "**Обовʼязково** для: «скільки в нас X», «хто має статус X», "
                 "«скільки людей у родині X», «чиї діти», «хто з менторів має "
                 "найбільше дітей», «хто з набору X».\n"
@@ -106,10 +102,7 @@ QUERY_MEMBERS_TOOL = types.Tool(
                     "status": types.Schema(
                         type=types.Type.STRING,
                         enum=["Observer", "Baby", "Full", "Alumni"],
-                        description=(
-                            "Рівень членства. Увага: на борді 9 людей, але фулів "
-                            "серед них 6 — троє на non-board посадах ще не фули."
-                        ),
+                        description="Рівень членства з довідника.",
                     ),
                     "state": types.Schema(
                         type=types.Type.STRING,
@@ -118,16 +111,13 @@ QUERY_MEMBERS_TOOL = types.Tool(
                     ),
                     "family": types.Schema(
                         type=types.Type.STRING,
-                        enum=["Президенти", "Монголи", "Кролики", "Білики",
-                              "Легофемелі"],
-                        description="Бестівська родина.",
+                        description="Назва групи менторства, дослівно з довідника.",
                     ),
                     "mentor": types.Schema(
                         type=types.Type.STRING,
                         description=(
-                            "Ментор (ангел). Достатньо прізвища — воно однозначне "
-                            "для 138 менторів із 142. Порядок слів і прізвиська "
-                            "теж розпізнаються."
+                            "Імʼя, прізвище чи нік ментора. Якщо є кілька збігів, "
+                            "попроси уточнити, кого саме мають на увазі."
                         ),
                     ),
                     "joined_from": types.Schema(
@@ -165,11 +155,8 @@ GET_DOCUMENT_TOOL = types.Tool(
             name="get_document",
             description=(
                 "Читає документ бази знань ЦІЛКОМ, а не фрагментами.\n"
-                "Навіщо: пошук віддає лише найближчі фрагменти з усієї бази, а один "
-                "документ може мати 127 чанків. Тому на питання «дай усі X з "
-                "цього документа» пошук фізично не може відповісти повно: "
-                "у протоколі SAAR 17 голосувань, і один запит приносить 3 з них. "
-                "Ти цього не бачиш — відповідь виглядає повною.\n"
+                "Пошук віддає найрелевантніші фрагменти з усієї бази, тож може "
+                "пропустити частину пунктів у потрібному документі.\n"
                 "Коли викликати:\n"
                 "• потрібно ВСЕ з одного документа — усі голосування, весь склад, "
                 "уся процедура, усі пункти статуту;\n"
@@ -177,6 +164,9 @@ GET_DOCUMENT_TOOL = types.Tool(
                 "імен, є пункт 3 без пунктів 1 і 2;\n"
                 "• користувач каже, що відповідь неповна — не переформульовуй "
                 "пошук по колу, бери документ.\n"
+                "• фрагмент — опис таблиці («Таблиця. Повний вміст — "
+                "get_document»): у пошуку лише шапка й два рядки, решта рядків — "
+                "тільки в документі.\n"
                 "Не викликай, якщо на питання вже відповіли фрагменти: "
                 "документ коштує більше контексту.\n"
                 "Спершу зроби пошук, візьми `source_id` з його результату — "
@@ -211,7 +201,8 @@ FIND_PERSON_TOOL = types.Tool(
         types.FunctionDeclaration(
             name="find_person",
             description=(
-                "Знаходить людину в довіднику членів BEST Lviv за іменем або прізвищем. "
+                "Знаходить людину в довіднику членів за іменем, прізвищем "
+                "або ніком у Telegram (`@nick`, `t.me/nick`). "
                 "Повертає профіль: статус, активність, родину, дату вступу, ментора, "
                 "контакти — і головне, історію посад та ролей на івентах.\n"
                 "Це ЄДИНЕ джерело картки людини: статус, активність, родина, ангел, "
@@ -223,20 +214,19 @@ FIND_PERSON_TOOL = types.Tool(
                 "цей інструмент І пошук по базі одним кроком — вони йдуть паралельно. "
                 "Виняток — коротке питання, на яке картка й відповідає («який у Х "
                 "телефон», «Х ще фул?», «коли в неї день народження»).\n"
-                "Передавай лише імʼя та/або прізвище, без питальних слів: «Мартинюк Дмитро», "
-                "а не «хто такий Дмитро Мартинюк».\n"
+                "Передавай лише імʼя, прізвище або нік, без питальних слів.\n"
                 "Якщо повернеться кілька людей — не вгадуй, але й не мовчи: "
                 "перелічи їх користувачеві й попроси уточнити. Показати список "
                 "кандидатів — це не вигадка, а допомога. Те саме, коли точного збігу "
                 "немає, але є схожі: спробуй імовірну повну форму імені "
-                "(Лекс → Олексій, Діма → Дмитро) і покажи, кого знайшов."
+                "і покажи, кого знайшов."
             ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "name": types.Schema(
                         type=types.Type.STRING,
-                        description="Імʼя та/або прізвище людини",
+                        description="Імʼя та/або прізвище людини або її нік у Telegram",
                     )
                 },
                 required=["name"],
@@ -251,22 +241,14 @@ FIND_BY_POSITION_TOOL = types.Tool(
         types.FunctionDeclaration(
             name="find_by_position",
             description=(
-                "Знаходить людей за ПОСАДОЮ, коли імені не знають: «хто МО "
-                "весняного MW», «хто PR-відповідальний CTF», «є вже МО МВ». "
+                "Знаходить людей за посадою, коли імені не знають. "
                 "find_person так не працює — він шукає лише за іменем.\n"
-                "Посади в довіднику записані англійською, як у інфобуці, тому "
-                "перекладай: «мо мв» → `MO MW`, «пр респонсібл» → "
-                "`PR Responsible`, «хостес» → `Hostess`. Скорочення лишай "
-                "скороченнями (MO, PR, DS, CR, LG, CT), не розкривай їх.\n"
-                "**Шукай без року.** Роки в базі пишуть по-різному — "
-                "`MO MW Autumn’26` і `MO MW Spring'2026` — тож рік у запиті "
-                "відрізає правильні збіги. Спитали про цьогорічного МО МВ — "
-                "передай `MO MW` і візьми рік уже з відповіді.\n"
-                "Ролі чинного борду шукаються і за канонічним скороченням "
-                "(`President`, `Treasurer`, `Secretary`, `VP4HR`, `VP4IT`, "
-                "`VP4PR`, `VP4CR`, `VP4DS`, `VP4IR`), і за повною назвою "
-                "(`Vice president for Human Resources`) — бо в довіднику вони "
-                "записані двома способами.\n"
+                "Посади записані англійською. Передавай канонічну назву або "
+                "скорочення з довідника. Наприклад, «відповідальний за PR» → "
+                "`PR Responsible`.\n"
+                "**Шукай без року.** Роки в довіднику записані різними способами, "
+                "тож уточнюй період уже за результатом. Довгі назви керівних "
+                "посад можуть мати канонічне скорочення.\n"
                 "У відповіді: `matched_current` — посада зараз, `matched_past` — "
                 "колишня, і в самому рядку стоїть івент та рік; `board_role` — "
                 "роль у чинному борді. Спершу йдуть ті, хто на посаді зараз. "
@@ -285,7 +267,7 @@ FIND_BY_POSITION_TOOL = types.Tool(
                         type=types.Type.STRING,
                         description=(
                             "Назва посади англійською, без року й без питальних "
-                            "слів: `MO MW`, `PR Responsible`, `Logistics Team`. "
+                            "слів: `PR Responsible`, `Logistics Team`. "
                             "Знайдуться рядки, де стоять усі передані слова."
                         ),
                     )
@@ -297,15 +279,30 @@ FIND_BY_POSITION_TOOL = types.Tool(
 )
 
 
+# Notion віддає посилання з тексту сторінки відносними: `/p/<id>?pvs=25#<блок>`
+# або `/<id>#<блок>`. Відкривається лише `app.notion.com/p/<id>`: так виглядають
+# `documents.url` і посилання, що їх Notion сам пише абсолютними, а
+# `app.notion.com/<id>` без `/p/` дає 404.
+_NOTION_RELATIVE_LINK = re.compile(r"\]\(/(?:p/)?([0-9a-f]{32})([?#][^)\s]*)?\)")
+
+
+def absolute_notion_links(text: str) -> str:
+    """Робить відносні посилання Notion у markdown абсолютними."""
+    return _NOTION_RELATIVE_LINK.sub(
+        lambda m: f"](https://app.notion.com/p/{m[1]}{m[2] or ''})", text
+    )
+
+
 async def run_search(
     qdrant: QdrantRepository,
     query: str,
     terms: list[str] | None,
     limit: int,
+    scopes: list[str],
 ) -> dict:
     """Виконує пошук і готує результат для моделі."""
     try:
-        hits = await qdrant.search(query, terms=terms, limit=limit)
+        hits = await qdrant.search(query, scopes, terms=terms, limit=limit)
     except Exception:
         logger.exception("tool search failed: %r terms=%r", query, terms)
         return {"error": "пошук тимчасово недоступний"}
@@ -319,12 +316,14 @@ async def run_search(
             "source_id": h.chunk.source_id,  # щоб можна було взяти документ цілком
             "title": h.chunk.title,
             "url": h.chunk.url,
-            "text": h.chunk.text[:1500],
+            "text": absolute_notion_links(h.chunk.text),
         }
         # шлях є лише в файлів з Drive; у Notion його поки немає, і порожнє
         # поле в кожному з 25 фрагментів — це зайвий шум у контексті
         if h.chunk.path:
             item["path"] = h.chunk.path
+        if h.chunk.section:
+            item["section"] = h.chunk.section
         results.append(item)
     return {"results": results}
 
@@ -337,11 +336,12 @@ def _partial_match_note(name: str, people: list[dict]) -> str | None:
     повним імʼям у довіднику немає. Модель приймала це за підтвердження, що Тарас
     Татарчинський існує, і добудовувала спорідненість («його брат Тарас»).
     """
-    asked = [w.lower() for w in re.findall(r"\w{3,}", name)]
+    asked = [w.lower() for w in re.findall(r"\w{3,}", fold_apostrophes(name))]
     if len(asked) < 2:
         return None
     for person in people:
-        full = f"{person.get('first_name', '')} {person.get('last_name', '')}".lower()
+        full = f"{person.get('first_name', '')} {person.get('last_name', '')}"
+        full = fold_apostrophes(full).lower()
         parts = full.split()
         if all(any(part.startswith(word) for part in parts) for word in asked):
             return None
@@ -420,11 +420,13 @@ async def run_find_by_position(mongo: MongoConnector, position: str) -> dict:
     return result
 
 
-async def run_get_document(source_id: str, part: int, part_chars: int) -> dict:
+async def run_get_document(
+    source_id: str, part: int, part_chars: int, scopes: list[str]
+) -> dict:
     """Віддає повний текст документа — той самий, що пішов у чанкер."""
     try:
         async with async_session_maker() as db:
-            doc = await documents.get_document(db, source_id)
+            doc = await documents.get_document(db, source_id, scopes)
     except Exception:
         logger.exception("tool get_document failed: %r", source_id)
         return {"error": "сховище документів тимчасово недоступне"}
@@ -438,13 +440,15 @@ async def run_get_document(source_id: str, part: int, part_chars: int) -> dict:
             )
         }
 
-    total = max(1, -(-len(doc.text) // part_chars))
+    # заміна до нарізки на частини: інакше межа частини може розрізати посилання
+    text = absolute_notion_links(doc.text)
+    total = max(1, -(-len(text) // part_chars))
     part = max(1, min(part, total))
     start = (part - 1) * part_chars
 
     logger.info(
         "tool get_document: %r частина %d/%d (%d символів)",
-        doc.title, part, total, len(doc.text),
+        doc.title, part, total, len(text),
     )
     result = {
         "title": doc.title,
@@ -452,7 +456,7 @@ async def run_get_document(source_id: str, part: int, part_chars: int) -> dict:
         "last_edited": doc.last_edited,
         "part": part,
         "parts_total": total,
-        "text": doc.text[start : start + part_chars],
+        "text": text[start : start + part_chars],
     }
     if doc.path:
         result["path"] = doc.path
@@ -511,9 +515,10 @@ class ToolSpec:
     """
 
     declaration: types.Tool
-    # (залежності, аргументи, ліміти) -> результат. Залежності — будь-що з
-    # .qdrant і .mongo: у бота це RagChain, у MCP — app.state.
-    run: Callable[[Any, dict, Limits], Awaitable[dict]]
+    # (залежності, аргументи, ліміти, scopes) -> результат. Залежності — будь-що
+    # з .qdrant і .mongo: у бота це RagChain, у MCP — app.state. scopes — що
+    # користувачу можна бачити в базі знань; довідника членів не стосується.
+    run: Callable[[Any, dict, Limits, list[str]], Awaitable[dict]]
     label: str  # як дія зветься для людини: «Пошук в базі»
     icon: str  # для згорнутого блока в повідомленні
     arg: str | None = None  # який аргумент показати поруч із назвою
@@ -556,8 +561,12 @@ def _by_name(*specs: ToolSpec) -> dict[str, ToolSpec]:
 TOOLS = _by_name(
     ToolSpec(
         declaration=SEARCH_TOOL,
-        run=lambda deps, args, limits: run_search(
-            deps.qdrant, args.get("query", ""), args.get("terms"), limits.search
+        run=lambda deps, args, limits, scopes: run_search(
+            deps.qdrant,
+            args.get("query", ""),
+            args.get("terms"),
+            limits.search,
+            scopes,
         ),
         label="Пошук в базі",
         icon="🔎",
@@ -565,7 +574,7 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=FIND_PERSON_TOOL,
-        run=lambda deps, args, _limits: run_find_person(
+        run=lambda deps, args, _limits, _scopes: run_find_person(
             deps.mongo, args.get("name", "")
         ),
         label="Перегляд профілю",
@@ -574,7 +583,7 @@ TOOLS = _by_name(
     ),
     ToolSpec(
         declaration=FIND_BY_POSITION_TOOL,
-        run=lambda deps, args, _limits: run_find_by_position(
+        run=lambda deps, args, _limits, _scopes: run_find_by_position(
             deps.mongo, args.get("position", "")
         ),
         label="Пошук за посадою",
@@ -584,17 +593,20 @@ TOOLS = _by_name(
     ToolSpec(
         declaration=GET_DOCUMENT_TOOL,
         # документ читається з Postgres, залежності тут не потрібні
-        run=lambda _deps, args, limits: run_get_document(
+        run=lambda _deps, args, limits, scopes: run_get_document(
             args.get("source_id", ""),
             int(args.get("part") or 1),
             limits.document_part,
+            scopes,
         ),
         label="Читання документа",
         icon="📄",
     ),
     ToolSpec(
         declaration=QUERY_MEMBERS_TOOL,
-        run=lambda deps, args, _limits: run_query_members(deps.mongo, **args),
+        run=lambda deps, args, _limits, _scopes: run_query_members(
+            deps.mongo, **args
+        ),
         label="Перегляд інфобука",
         icon="📊",
         describe=_members_label,

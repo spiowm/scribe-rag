@@ -7,6 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from src.config import settings
+from src.models.access import Drive, DriveOptOut, GroupMember  # noqa: F401
 from src.models.base import Base
 from src.models.chat_session import ChatSession  # noqa: F401
 from src.models.document import Document  # noqa: F401

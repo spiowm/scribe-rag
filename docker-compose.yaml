@@ -37,14 +37,29 @@ services:
       QDRANT_HOST: qdrant
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       NOTION_TOKEN: ${NOTION_TOKEN:?}
+      NOTION_USERS_DB_ID: ${NOTION_USERS_DB_ID:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
+      ORG_CONTEXT: ${ORG_CONTEXT:-}
       MONGO_URI: ${MONGO_URI:?}
       GOOGLE_DRIVE_CREDENTIALS_JSON: ${GOOGLE_DRIVE_CREDENTIALS_JSON:?}
+      # робочі диски в пошуку (id через кому); порожньо — лише загальне
+      GOOGLE_DRIVE_IDS: ${GOOGLE_DRIVE_IDS:-}
+      GOOGLE_DRIVE_GENERAL_ID: ${GOOGLE_DRIVE_GENERAL_ID:-}
+      GOOGLE_DRIVE_GENERAL_FOREIGN: ${GOOGLE_DRIVE_GENERAL_FOREIGN:-}
+      GOOGLE_DRIVE_GENERAL_FOREIGN_LABEL: ${GOOGLE_DRIVE_GENERAL_FOREIGN_LABEL:-інші загальні джерела}
+      GOOGLE_DRIVE_FULL_MEMBERS_GROUP: ${GOOGLE_DRIVE_FULL_MEMBERS_GROUP:-}
+      GOOGLE_DRIVE_ADMIN_GROUP: ${GOOGLE_DRIVE_ADMIN_GROUP:-}
+      GOOGLE_DRIVE_PAUSED_IDS: ${GOOGLE_DRIVE_PAUSED_IDS:-}
+      # бази Notion таблицями: id[:властивість для поділу] через кому
+      NOTION_DATABASE_IDS: ${NOTION_DATABASE_IDS:-}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?}
       ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-}
       KEYRING_PW: ${KEYRING_PW:-}
+      # Обовʼязковий: без нього будь-хто з доступом до порту підставляє чужий
+      # telegram_id і читає чужі диски. Локально — будь-який рядок.
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?задай INTERNAL_API_TOKEN, однаковий для backend і bot}"
     volumes:
       - agy_home:/home/app
     ports:
@@ -63,6 +78,7 @@ services:
       BACKEND_URL: http://backend:8000
       BOT_TOKEN: ${BOT_TOKEN:?}
       ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-}
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?задай INTERNAL_API_TOKEN, однаковий для backend і bot}"
     depends_on:
       backend:
         condition: service_started
@@ -72,7 +88,7 @@ services:
     # MCP і OAuth. Домен дивиться сюди, backend лишається внутрішнім.
     build: ./backend
     restart: unless-stopped
-    command: ["uv", "run", "uvicorn", "src.public.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    command: ["uv", "run", "--no-dev", "uvicorn", "src.public.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
     environment:
       POSTGRES_HOST: postgres
       QDRANT_HOST: qdrant
@@ -80,14 +96,13 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
       MONGO_URI: ${MONGO_URI:?}
       PUBLIC_URL: ${MCP_PUBLIC_URL:?}
-      # Settings вимагає ці поля, але публічному сервісу вони не потрібні.
-      # Порожні значення — щоб секрети Notion, Drive і R2 не лежали
-      # в контейнері, відкритому в інтернет.
-      NOTION_TOKEN: ""
-      GOOGLE_DRIVE_CREDENTIALS_JSON: ""
-      R2_ACCOUNT_ID: ""
-      R2_ACCESS_KEY_ID: ""
-      R2_SECRET_ACCESS_KEY: ""
+      # Не секрет: `who_am_i` з нього бачить, які диски підключені.
+      GOOGLE_DRIVE_IDS: ${GOOGLE_DRIVE_IDS:-}
+      GOOGLE_DRIVE_FULL_MEMBERS_GROUP: ${GOOGLE_DRIVE_FULL_MEMBERS_GROUP:-}
+      GOOGLE_DRIVE_ADMIN_GROUP: ${GOOGLE_DRIVE_ADMIN_GROUP:-}
+      GOOGLE_DRIVE_PAUSED_IDS: ${GOOGLE_DRIVE_PAUSED_IDS:-}
+      # Секретів Notion, Drive і R2 тут свідомо немає: публічному сервісу
+      # вони не потрібні, а контейнер відкритий в інтернет.
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${MCP_HOST_PORT:-8077}:8000"
     depends_on:

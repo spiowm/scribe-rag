@@ -4,18 +4,29 @@ The [README](../README.md#setup) lists the variables required by [Compose](../do
 
 ## Source configuration
 
-The application settings include defaults for the original BEST Lviv installation. For a separate instance, pass these settings through a Compose override or set them in the environment of the corresponding host processes. Notion sync uses the pages visible to the integration token. Give the Google service account access to the selected Drive folders.
+Set the Drive source IDs and any group mappings through Compose or in the environment of the corresponding host processes. Notion sync uses the pages visible to the integration token and any databases configured for table ingestion. Give the Google service account access to the selected Drive folders.
 
 | Setting | Services | Value |
 | --- | --- | --- |
-| `GOOGLE_DRIVE_FOLDER_IDS` | Backend | Comma-separated Drive root folder IDs |
+| `GOOGLE_DRIVE_GENERAL_ID` | Backend | Shared drive indexed as general |
+| `GOOGLE_DRIVE_GENERAL_FOREIGN` | Backend | Comma-separated IDs of other drives whose files can be indexed as general through shortcuts on the general drive |
+| `GOOGLE_DRIVE_IDS` | Backend, MCP | Comma-separated IDs for additional work drives |
+| `GOOGLE_DRIVE_GENERAL_FOREIGN_LABEL` | Backend | Optional display label for the additional general sources |
+| `GOOGLE_DRIVE_FULL_MEMBERS_GROUP` | Backend, MCP | Optional Drive group granted by Full or Alumni status |
+| `GOOGLE_DRIVE_ADMIN_GROUP` | Backend, MCP | Optional infrastructure group omitted from access suggestions |
+| `GOOGLE_DRIVE_PAUSED_IDS` | Backend, MCP | Comma-separated work drive IDs to suspend |
+| `NOTION_DATABASE_IDS` | Backend | Comma-separated Notion databases to index as tables, optionally using `id:relation-property` to group rows |
 | `MONGO_DB`, `MONGO_USERS_COLLECTION` | Backend, MCP | Database and collection for member lookups |
 | `R2_BUCKET` | Backend | Bucket used to serve meme images |
 | `PUBLIC_URL` | MCP | Public MCP base URL. The service gets it from `MCP_PUBLIC_URL` in the checked-in Compose file. |
 | `TELEGRAM_BOT_USERNAME` | MCP | Username of the Telegram bot that issues MCP login codes |
 | `MCP_URL` | Bot | Public URL including `/mcp` |
 
-Use a MongoDB account with read-only access to the member directory. Keep PostgreSQL, Qdrant and the internal backend on loopback or a trusted private network. The backend sync routes rely on this network boundary. Expose only the OAuth-protected MCP service to external clients.
+Use a MongoDB account with read-only access to the member directory. Keep PostgreSQL, Qdrant and the internal backend on loopback or a trusted private network. The backend also checks `X-Internal-Token`. Generate a shared value for the backend and bot with `openssl rand -hex 32`. Expose only the OAuth-protected MCP service to external clients.
+
+Set `GOOGLE_DRIVE_GENERAL_ID` before syncing Drive. Indexed drive access depends on the configured group mappings and the permissions returned by Drive. Review those settings before syncing work drives. Keep the full intended source list during sync, since removing a source from the configuration can remove its indexed documents.
+
+To pause a work drive, keep its ID in `GOOGLE_DRIVE_IDS` and add it to `GOOGLE_DRIVE_PAUSED_IDS` for both the backend and MCP. The services hide that drive from lookup and settings while sync preserves its existing extracted text and vectors. Remove the ID from the pause list and run an incremental sync to bring the drive up to date. The common sources use a shared scope and require separate configuration.
 
 ## Coolify
 
@@ -26,6 +37,12 @@ Use a MongoDB account with read-only access to the member directory. Keep Postgr
 The checked-in Compose file passes through the settings it lists under `environment`. Add other overrides under the service that consumes them, or confirm Coolify has injected them into that service. Use `AGY_MODEL` to select the chat model. Set `AGY_FALLBACK_TO_API=true` only to opt in to Gemini API fallback. The separate `LLM_PROVIDER=gemini` setting selects Gemini API answers directly. [Backend settings](../backend/src/config.py)
 
 Review the application's deployment policy before pushing changes to its watched branch. [Coolify automatic deployments](https://coolify.io/docs/applications/deployments/automatic-deployments)
+
+### Organization context
+
+Use the optional backend variable `ORG_CONTEXT` for background and terminology suitable for all bot users. The backend adds it to the Telegram answer prompt for both generation providers. MCP uses its own server and tool descriptions.
+
+In Coolify's Normal view, enter the value as UTF-8 text, select **Multiline**, enable **Runtime** and disable **Build time**. A blank value uses the shared prompt on its own. After recreating the backend, verify the line breaks in the container without printing the value in logs. [Coolify environment variables](https://coolify.io/docs/applications/configuration/environment-variables)
 
 ## Sign in to agy
 

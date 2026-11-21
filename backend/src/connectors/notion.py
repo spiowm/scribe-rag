@@ -54,6 +54,13 @@ class NotionConnector:
                 return None
         return None
 
+    async def _path(self, parent: dict) -> str:
+        """Назва батьківської сторінки; корінь workspace — порожній шлях."""
+        parent_id = await self._parent_page_id(parent)
+        page = self._raw.get(parent_id or "")
+        title = self._page_title(page).strip() if page else ""
+        return "" if title in ROOT_TITLES else title
+
     async def resolve_paths(self, pages: list[NotionPage]) -> None:
         """Ставить path = назва батьківської сторінки.
 
@@ -62,10 +69,28 @@ class NotionConnector:
         """
         for page in pages:
             raw = self._raw.get(page.id) or {}
-            parent_id = await self._parent_page_id(raw.get("parent") or {})
-            parent = self._raw.get(parent_id or "")
-            title = self._page_title(parent).strip() if parent else ""
-            page.path = "" if title in ROOT_TITLES else title
+            page.path = await self._path(raw.get("parent") or {})
+
+    @property
+    def raw_pages(self) -> dict[str, dict]:
+        """Усі сторінки з останнього `fetch_all_pages`, і рядки баз теж:
+        з них relation у базах розв'язуються в назви без зайвих запитів."""
+        return self._raw
+
+    async def fetch_database(self, database_id: str) -> tuple[dict, list[dict], str]:
+        """База, усі її рядки (з усіх джерел даних) і шлях.
+
+        Запитів — 1 + рядків/100 (+ 1–3 на шлях); на 429 клієнт сам чекає й
+        повторює. Тіла рядків не беруться: у CRM вони порожні.
+        """
+        database = await self.notion.databases.retrieve(database_id)
+        rows: list[dict] = []
+        for source in database.get("data_sources") or []:
+            rows += await async_collect_paginated_api(
+                self.notion.data_sources.query, data_source_id=source["id"]
+            )
+        path = await self._path(database.get("parent") or {})
+        return database, rows, path
 
     async def fetch_all_pages(self) -> list[NotionPage]:
         """Бере всі сторінки з Notion (без сторінок з баз данних)"""

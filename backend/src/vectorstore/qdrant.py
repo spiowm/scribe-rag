@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 
 from llama_index.core.schema import MetadataMode, TextNode
@@ -13,21 +14,65 @@ from qdrant_client.http.models import (
     Distance,
     FieldCondition,
     Filter,
+    IsEmptyCondition,
+    KeywordIndexParams,
+    KeywordIndexType,
+    MatchAny,
     MatchText,
     MatchValue,
+    PayloadField,
     PointStruct,
+    SearchParams,
     TextIndexParams,
     TextIndexType,
     TokenizerType,
     VectorParams,
 )
 
-from src.ingestion.schemas import ChunkPayload, SearchHit
+from src.ingestion.schemas import GENERAL, ChunkPayload, SearchHit
+from src.text import APOSTROPHES
 
 logger = logging.getLogger(__name__)
 
+# Токенізатор WORD вважає `ʼ` (U+02BC) літерою, а решту апострофів — пробілом:
+# `ІЯКʼ17` одне слово, `ІЯК’17` два, `ІЯК17` знову одне. У документах трапляються
+# усі три (ІЯК: 24 склеєних, 20 з `ʼ`, 60 з іншими апострофами), тож фільтр за
+# однією формою губить решту.
+_IN_WORD_APOSTROPHE = re.compile(rf"(?<=\w)[{APOSTROPHES}](?=\w)")
+# Літери й рівно дві цифри в кінці: склеєна хвиля чи рік (`ІЯК17`, `HACK10`).
+_GLUED_YEAR = re.compile(r"^(.*[^\W\d_])(\d{2})$")
+
+
+def term_forms(term: str) -> list[str]:
+    """Написання назви, під якими вона може бути в тексті."""
+    if _IN_WORD_APOSTROPHE.search(term):
+        parts = _IN_WORD_APOSTROPHE.split(term)
+    elif match := _GLUED_YEAR.match(term):
+        parts = list(match.groups())
+    else:
+        return [term]
+    forms = ["’".join(parts), "ʼ".join(parts), "".join(parts)]
+    return list(dict.fromkeys(forms))
+
 
 class QdrantRepository:
+    # Надбавка до скору загального (Notion і загальний диск), коли в пошуку є
+    # і робочі диски: інакше списки й чернетки подій витісняють хендбуки з
+    # питань, що до події не стосуються. Заміряно з усім диском BTW, разом із
+    # таблицями (08.11): у питаннях не про події фрагментів диска з 25 без
+    # надбавки 6.5, з 0.01 — 3.5, з 0.02 — 1.8, і топ-5 без диска зберігається
+    # повністю; еталон питань про випуски BTW той самий за всіх трьох (31/32 у
+    # топ-25, 29/32 у топ-5). У пілоті 0.04 уже ламав пошук по випусках.
+    # Перезаміряти з кожним новим диском.
+    GENERAL_BONUS = 0.02
+    # У скільки разів більше кандидатів брати, щоб надбавці було з чого вибирати.
+    BONUS_POOL = 3
+    # Точний перебір замість HNSW: на 7 тис. точок той самий час (медіана 17 мс
+    # з дисками), а HNSW з типовим ef міняв топ-5 в 11 із 201 справжнього
+    # питання, і щоразу по-іншому після reindex — заміри бонусу між прогонами
+    # тоді не порівнянні (`research/qdrant-exact/`). Переглянути від ~100 тис. точок.
+    EXACT = SearchParams(exact=True)
+
     def __init__(
         self,
         url: str,
@@ -39,7 +84,11 @@ class QdrantRepository:
         self.embedding_model = embedding_model
 
     async def search(
-        self, query: str, terms: list[str] | None = None, limit: int = 25
+        self,
+        query: str,
+        scopes: list[str],
+        terms: list[str] | None = None,
+        limit: int = 25,
     ) -> list[SearchHit]:
         """Векторний пошук плюс окремий запит на кожну власну назву.
 
@@ -52,32 +101,45 @@ class QdrantRepository:
         Скори порівнянні, бо вектор один і той самий — фільтр змінює не
         оцінювання, а те, які фрагменти до нього допускаються. Тому злиття
         це просте сортування, без RRF.
+
+        `scopes` — що цьому користувачу можна бачити. Без значення за
+        замовчуванням навмисно: забутий аргумент має падати, а не відкривати.
         """
+        allowed = self._scope_filter(scopes)
+        bonus = self.GENERAL_BONUS
+        # лише загальне — порівнювати нема з чим, і поведінка як до дисків
+        mixed = bonus > 0 and any(s != GENERAL for s in scopes)
+
+        def ranked(point) -> float:
+            general = (point.payload or {}).get("scope") == GENERAL
+            return point.score + (bonus if mixed and general else 0.0)
+
         query_vector = await self.embedding_model.aget_query_embedding(query)
 
         results = await self.qdrant_client.query_points(
             collection_name=self.alias,
             query=query_vector,
-            limit=limit,
+            limit=limit * self.BONUS_POOL if mixed else limit,
+            query_filter=Filter(must=[allowed]),
+            search_params=self.EXACT,
         )
-        points = list(results.points)
+        points = sorted(results.points, key=ranked, reverse=True)[:limit]
         seen = {point.id for point in points}
 
-        for term in await self._rare_terms(terms or [], max_df=limit * 4):
+        for term in await self._rare_terms(terms or [], limit * 4, allowed):
             filtered = await self.qdrant_client.query_points(
                 collection_name=self.alias,
                 query=query_vector,
                 limit=limit,
-                query_filter=Filter(
-                    must=[FieldCondition(key="text", match=MatchText(text=term))]
-                ),
+                query_filter=Filter(must=[allowed, self._term_filter(term)]),
+                search_params=self.EXACT,
             )
             for point in filtered.points:
                 if point.id not in seen:
                     seen.add(point.id)
                     points.append(point)
 
-        points.sort(key=lambda point: point.score, reverse=True)
+        points.sort(key=ranked, reverse=True)
         return [
             SearchHit(
                 score=point.score, chunk=ChunkPayload.model_validate(point.payload)
@@ -86,18 +148,78 @@ class QdrantRepository:
             if point.payload is not None
         ]
 
+    @staticmethod
+    def _term_filter(term: str) -> Filter:
+        """Фрагмент містить назву в будь-якому з написань (`term_forms`)."""
+        return Filter(
+            should=[
+                FieldCondition(key="text", match=MatchText(text=form))
+                for form in term_forms(term)
+            ]
+        )
+
+    @staticmethod
+    def _scope_filter(scopes: list[str]) -> FieldCondition:
+        if not scopes:
+            raise ValueError("порожній scopes: пошук не має що дозволити")
+        return FieldCondition(key="scope", match=MatchAny(any=list(scopes)))
+
     async def ensure_collection(self) -> None:
         if not await self.qdrant_client.collection_exists(self.alias):
             collection_name = await self._create_collection()
             await self._switch_alias(collection_name)
+        await self._backfill_scope()
 
-    async def index_state(self, source: str) -> dict[str, str]:
-        """{source_id: last_edited} — що зараз у живій колекції для вказаного джерела."""
+    async def _backfill_scope(self) -> None:
+        """Точки з часів до доступів — без `scope`. Усе тоді було загальним.
+
+        Фільтр за `scope` таку точку просто не пропустить, тож без цього
+        після деплою зник би весь індекс. Ембединг не чіпається — лише payload.
+        """
+        current = await self._current_collection()
+        if current is None:
+            return
+        info = await self.qdrant_client.get_collection(current)
+        schema = info.payload_schema or {}
+        if "scope" not in schema:
+            await self._index_scope(current)
+        text_index = schema.get("text")
+        tokenizer = (
+            getattr(text_index.params, "tokenizer", None) if text_index else None
+        )
+        if tokenizer != self.TEXT_INDEX.tokenizer:
+            # payload-індекс перебудовується з тих самих точок, вектори не чіпаються
+            if text_index:
+                await self.qdrant_client.delete_payload_index(current, "text")
+            await self._index_text(current)
+            logger.info("text-індекс перебудовано: %s -> word", tokenizer)
+        missing = Filter(must=[IsEmptyCondition(is_empty=PayloadField(key="scope"))])
+        count = (await self.qdrant_client.count(current, count_filter=missing)).count
+        if count:
+            await self.qdrant_client.set_payload(
+                collection_name=current,
+                payload={"scope": GENERAL},
+                points=missing,
+                wait=True,
+            )
+            logger.info("scope=%s дописано %d точкам", GENERAL, count)
+
+    async def _index_scope(self, collection_name: str) -> None:
+        await self.qdrant_client.create_payload_index(
+            collection_name=collection_name,
+            field_name="scope",
+            field_schema=KeywordIndexParams(
+                type=KeywordIndexType.KEYWORD, is_tenant=True
+            ),
+        )
+
+    async def index_state(self, source: str) -> dict[str, tuple[str, str, str]]:
+        """{source_id: (last_edited, scope, path)} — що зараз у живій колекції."""
         current = await self._current_collection()
         if not current:
             return {}
 
-        state: dict[str, str] = {}
+        state: dict[str, tuple[str, str, str]] = {}
         offset = None
         batch_size = 500
 
@@ -116,7 +238,7 @@ class QdrantRepository:
                 offset=offset,
                 limit=batch_size,
                 scroll_filter=scroll_filter,
-                with_payload=["source_id", "last_edited"],
+                with_payload=["source_id", "last_edited", "scope", "path"],
                 with_vectors=False,
             )
 
@@ -125,7 +247,9 @@ class QdrantRepository:
                     source_id = r.payload.get("source_id")
                     last_edited = r.payload.get("last_edited")
                     if source_id and last_edited:
-                        state[source_id] = last_edited
+                        scope = r.payload.get("scope", GENERAL)
+                        path = r.payload.get("path", "")
+                        state[source_id] = (last_edited, scope, path)
 
             if next_offset is None:
                 break
@@ -156,7 +280,10 @@ class QdrantRepository:
         return copied + added
 
     async def _create_collection(self) -> str:
-        name = self.alias + "_" + datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        # мілісекунди: дві колекції в ту саму секунду (створення на старті й
+        # одразу синк) інакше отримували одне ім'я, і друга падала з 409
+        stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        name = f"{self.alias}_{stamp}"
         await self.qdrant_client.create_collection(
             collection_name=name,
             vectors_config=VectorParams(
@@ -164,18 +291,26 @@ class QdrantRepository:
                 distance=Distance.COSINE,
             ),
         )
-        await self.qdrant_client.create_payload_index(
-            collection_name=name,
-            field_name="text",
-            field_schema=TextIndexParams(
-                type=TextIndexType.TEXT,
-                tokenizer=TokenizerType.MULTILINGUAL,
-                min_token_len=2,
-                max_token_len=20,
-                lowercase=True,
-            ),
-        )
+        await self._index_text(name)
+        await self._index_scope(name)
         return name
+
+    # `word`, а не `multilingual`: той викидав окремі числа, тож `CTF'24`
+    # фільтрував по всьому CTF, а `2019` не знаходив нічого (F9, пілот 12.10).
+    TEXT_INDEX = TextIndexParams(
+        type=TextIndexType.TEXT,
+        tokenizer=TokenizerType.WORD,
+        min_token_len=2,
+        max_token_len=20,
+        lowercase=True,
+    )
+
+    async def _index_text(self, collection_name: str) -> None:
+        await self.qdrant_client.create_payload_index(
+            collection_name=collection_name,
+            field_name="text",
+            field_schema=self.TEXT_INDEX,
+        )
 
     async def _current_collection(self) -> str | None:
         """Колекція, на яку зараз вказує аліас."""
@@ -263,7 +398,9 @@ class QdrantRepository:
 
         return len(points)
 
-    async def _rare_terms(self, terms: list[str], max_df: int) -> list[str]:
+    async def _rare_terms(
+        self, terms: list[str], max_df: int, allowed: FieldCondition
+    ) -> list[str]:
         """Лишає до двох найрідкісніших назв із тих, що взагалі є в базі.
 
         Поріг не про якість — окремий запит на кожну назву й так не дає
@@ -276,6 +413,9 @@ class QdrantRepository:
 
         Нуль відсікаємо з іншої причини: якщо модель дала форму, якої в базі
         немає, запит із таким фільтром вернув би порожнечу.
+
+        Рахується лише в дозволеному: інакше частота слова в закритих
+        дисках і впливала б на пошук, і видавала б, що таке слово там є.
         """
         if not terms:
             return []
@@ -283,9 +423,7 @@ class QdrantRepository:
         async def _count(term: str) -> tuple[str, int]:
             res = await self.qdrant_client.count(
                 collection_name=self.alias,
-                count_filter=Filter(
-                    must=[FieldCondition(key="text", match=MatchText(text=term))]
-                ),
+                count_filter=Filter(must=[allowed, self._term_filter(term)]),
             )
             return term, res.count
 
@@ -295,16 +433,20 @@ class QdrantRepository:
         return [term for term, _ in usable[:2]]
 
     async def _cleanup_old_collections(self) -> int:
-        """Видаляє всі колекції, крім поточної (за аліасом)"""
+        """Видаляє старі колекції цього аліасу, крім поточної.
+
+        Лише `<аліас>_<час>` з `_create_collection`: за самим префіксом
+        `general_` прибирання `general` знесло б і `general_ctx_<час>` —
+        колекцію іншого аліасу поруч.
+        """
         current = await self._current_collection()
 
         if current is None:
             return 0
+        own = re.compile(rf"{re.escape(self.alias)}_\d{{8}}_\d{{6}}(?:_\d{{3}})?")
         cols = await self.qdrant_client.get_collections()
         collections_names = [
-            col.name
-            for col in cols.collections
-            if col.name.startswith(f"{self.alias}_")
+            col.name for col in cols.collections if own.fullmatch(col.name)
         ]
 
         deleted_count = 0
