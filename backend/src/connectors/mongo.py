@@ -3,7 +3,12 @@ from datetime import datetime
 
 from pymongo import AsyncMongoClient
 
-from src.text import LOOKALIKE, any_apostrophe_regex, fold_apostrophes
+from src.text import (
+    LOOKALIKE,
+    drop_apostrophes,
+    fold_apostrophes,
+    optional_apostrophe_regex,
+)
 
 STATES = ("Active", "Inactive")
 STATUSES = ("Observer", "Baby", "Full", "Alumni")
@@ -11,8 +16,8 @@ POSITION_WORD = re.compile(r"\w+")
 
 
 def _prefix_pattern(token: str) -> dict:
-    """Регулярка «поле починається з token», апостроф у token — будь-який."""
-    return {"$regex": "^" + any_apostrophe_regex(token), "$options": "i"}
+    """Регулярка «поле починається з token» без огляду на апострофи."""
+    return {"$regex": "^" + optional_apostrophe_regex(token), "$options": "i"}
 
 
 # `telegram_username` у довіднику — без «@», регістр довільний; на вхід може
@@ -93,8 +98,8 @@ class MongoConnector:
 
         def _match_score(doc: dict, tokens: list[str]) -> int:
             """Наскільки документ відповідає токенам запиту."""
-            last = fold_apostrophes(doc.get("last_name") or "").lower()
-            first = fold_apostrophes(doc.get("first_name") or "").lower()
+            last = drop_apostrophes(doc.get("last_name") or "").lower()
+            first = drop_apostrophes(doc.get("first_name") or "").lower()
 
             score = 0
             for token in tokens:
@@ -106,7 +111,7 @@ class MongoConnector:
                     score += 1
             return score
 
-        name = fold_apostrophes(name).lower()
+        name = drop_apostrophes(name).lower()
         tokens = [t for t in re.split(r"[\s,]+", name) if len(t) >= 3]
         if not tokens:
             return []
@@ -250,13 +255,13 @@ class MongoConnector:
         if mentor:
             # Поле завжди канонічне «Імʼя Прізвище», а на вхід може прийти
             # прізвище, зворотний порядок або прізвисько з мінетсів.
-            folded = fold_apostrophes(mentor).lower()
+            folded = drop_apostrophes(mentor).lower()
             tokens = {t for t in re.split(r"[\s,]+", folded) if len(t) >= 3}
             rows = [
                 (
                     f"{c.get('first_name', '')} {c.get('last_name', '')}".strip(),
-                    fold_apostrophes(c.get("last_name") or "").lower(),
-                    fold_apostrophes(c.get("first_name") or "").lower(),
+                    drop_apostrophes(c.get("last_name") or "").lower(),
+                    drop_apostrophes(c.get("first_name") or "").lower(),
                 )
                 for c in await self.search_members(mentor, limit=5)
             ]

@@ -10,7 +10,7 @@ from google.genai import types
 from src.connectors.mongo import MongoConnector
 from src.db import async_session_maker
 from src.repository import documents
-from src.text import fold_apostrophes
+from src.text import drop_apostrophes
 from src.vectorstore.qdrant import QdrantRepository
 
 logger = logging.getLogger(__name__)
@@ -336,12 +336,12 @@ def _partial_match_note(name: str, people: list[dict]) -> str | None:
     повним імʼям у довіднику немає. Модель приймала це за підтвердження, що Тарас
     Татарчинський існує, і добудовувала спорідненість («його брат Тарас»).
     """
-    asked = [w.lower() for w in re.findall(r"\w{3,}", fold_apostrophes(name))]
+    asked = [w.lower() for w in re.findall(r"\w{3,}", drop_apostrophes(name))]
     if len(asked) < 2:
         return None
     for person in people:
         full = f"{person.get('first_name', '')} {person.get('last_name', '')}"
-        full = fold_apostrophes(full).lower()
+        full = drop_apostrophes(full).lower()
         parts = full.split()
         if all(any(part.startswith(word) for part in parts) for word in asked):
             return None
