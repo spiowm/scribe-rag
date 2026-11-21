@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -62,7 +62,6 @@ class Settings(BaseSettings):
     # Модель для OCR та відповідей через API, незалежна від AGY_MODEL.
     # Для OCR рівень роздумів LOW задається в ingestion/extractors.py.
     GEMINI_LLM_MODEL: str = "gemini-3.8-flash"
-    ORG_CONTEXT: SecretStr = SecretStr("")
 
     # Модель через підписку agy замість платного API. "gemini" — через API.
     LLM_PROVIDER: str = "agy"

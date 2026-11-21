@@ -1,5 +1,6 @@
 """Хто які диски бачить: права дисків із Drive API × експорти Google-груп."""
 
+import asyncio
 import csv
 from dataclasses import dataclass, field
 
@@ -8,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.ingestion.schemas import GENERAL
 from src.models.access import Drive, DriveOptOut, GroupMember
@@ -113,6 +115,30 @@ async def import_group(db: AsyncSession, group: str, members: dict[str, str]) ->
             )
         )
     await db.commit()
+
+
+class DriveApiEmpty(Exception):
+    """Drive API повернув порожній список дисків."""
+
+
+async def refresh_drives(db: AsyncSession, gdrive: GDriveConnector) -> None:
+    """Перечитує список дисків і їхні права з Drive API."""
+    drives = await gdrive.list_drives()
+    if not drives:
+        # Порожній список — збій Drive API, а не «дисків немає»: зберегти його
+        # означало б забрати в усіх доступ до дисків.
+        raise DriveApiEmpty
+    drives = [d for d in drives if d["id"] not in settings.PAUSED_DRIVES]
+    principals = await asyncio.gather(
+        *(gdrive.drive_principals(d["id"]) for d in drives)
+    )
+    await save_drives(
+        db,
+        [
+            {"id": d["id"], "name": d["name"], "principals": p}
+            for d, p in zip(drives, principals)
+        ],
+    )
 
 
 async def save_drives(db: AsyncSession, drives: list[dict]) -> None:

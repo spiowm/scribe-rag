@@ -1,14 +1,12 @@
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_admin, get_db, get_gdrive_connector, get_mongo
-from src.api.schemas import GroupImportRequest
-from src.config import settings
+from src.api.schemas import AutosyncRequest, GroupImportRequest
 from src.connectors.gdrive import GDriveConnector
 from src.connectors.mongo import MongoConnector
 from src.generation import models_check
+from src.ingestion import autosync
 from src.models.user import User
 from src.repository import access, stats
 
@@ -33,6 +31,24 @@ async def read_access(
     return await access.overview(db)
 
 
+@router.post("/autosync")
+async def read_autosync(
+    admin: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Інтервал автосинку, час і результат останнього запуску."""
+    return await autosync.get_state(db)
+
+
+@router.post("/autosync/set")
+async def set_autosync(
+    body: AutosyncRequest,
+    admin: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    return await autosync.set_hours(db, body.hours)
+
+
 @router.post("/drives/refresh")
 async def refresh_drives(
     admin: User = Depends(get_admin),
@@ -40,23 +56,10 @@ async def refresh_drives(
     gdrive: GDriveConnector = Depends(get_gdrive_connector),
 ) -> dict:
     """Перечитує список дисків і їхні права з Drive API."""
-    drives = await gdrive.list_drives()
-    if not drives:
-        # Порожній список — збій Drive API, а не «дисків немає»: зберегти його
-        # означало б забрати в усіх доступ до дисків.
-        raise HTTPException(502, "drive_api_empty")
-    paused = settings.PAUSED_DRIVES
-    drives = [d for d in drives if d["id"] not in paused]
-    principals = await asyncio.gather(
-        *(gdrive.drive_principals(d["id"]) for d in drives)
-    )
-    await access.save_drives(
-        db,
-        [
-            {"id": d["id"], "name": d["name"], "principals": p}
-            for d, p in zip(drives, principals)
-        ],
-    )
+    try:
+        await access.refresh_drives(db, gdrive)
+    except access.DriveApiEmpty:
+        raise HTTPException(502, "drive_api_empty") from None
     return await access.overview(db)
 
 

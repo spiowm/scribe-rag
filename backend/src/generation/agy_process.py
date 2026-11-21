@@ -8,10 +8,6 @@ class AgyError(Exception):
     """Будь-який збій agy: не стартував, упав, тайм-аут, помилка у відповіді."""
 
 
-class AgyProviderError(AgyError):
-    """Помилка з текстом із процесу agy, який може повторювати введені дані."""
-
-
 class AgyProcess:
     def __init__(
         self,
@@ -61,9 +57,7 @@ class AgyProcess:
                 # Порожньо — значить agy закрив вихід, тобто процес завершився.
                 # Причину він пише в окремий канал помилок, stderr.
                 stderr = (await proc.stderr.read()).decode(errors="replace")
-                raise AgyProviderError(
-                    f"agy finished unexpectedly. stderr: {stderr[-500:]}"
-                )
+                raise AgyError(f"agy finished unexpectedly. stderr: {stderr[-500:]}")
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
@@ -138,9 +132,7 @@ class AgyProcess:
                 continue
             result = event["result"]
             if result.get("status") != "SUCCESS":
-                raise AgyProviderError(
-                    result.get("error") or f"status {result.get('status')}"
-                )
+                raise AgyError(result.get("error") or f"status {result.get('status')}")
 
             usage = result.get("usage") or {}
             keys = ("input_tokens", "cache_read_tokens", "output_tokens")

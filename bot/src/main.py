@@ -44,6 +44,7 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
                 *menu,
                 BotCommand(command="admin", description="Зведення"),
                 BotCommand(command="access", description="Доступи до дисків"),
+                BotCommand(command="autosync", description="Автосинк"),
             ],
             scope=BotCommandScopeChat(chat_id=settings.ADMIN_TELEGRAM_ID),
         )
