@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
-<p align="center"><a href="#demo">Demo</a> · <a href="#architecture">Architecture</a> · <a href="#setup">Setup</a></p>
+<p align="center"><a href="#demo">Demo</a> · <a href="#architecture">Architecture</a> · <a href="#evaluation">Evaluation</a> · <a href="#setup">Setup</a></p>
 
 ## Demo
 
@@ -58,6 +58,33 @@ Search in Telegram and MCP uses the drives available to the member. The Telegram
 - **Index updates.** A sync copies unchanged points into a new collection and embeds changed chunks. The live search alias switches after the replacement collection is populated and passes a size check. [Reindexing](backend/src/vectorstore/qdrant.py#L260-L280) · [Alias switch](backend/src/vectorstore/qdrant.py#L323-L333)
 
 The stack uses FastAPI, aiogram, LlamaIndex, Qdrant, PostgreSQL and MongoDB. The assistant began as an n8n workflow before its retrieval and indexing moved into Python. [Original n8n project](https://github.com/spiowm/n8n-infrastructure)
+
+### Agent tools
+
+The answer model in Telegram and MCP clients call the same read-only tools. [Tool declarations](backend/src/generation/tools.py)
+
+| Tool | What it does |
+| --- | --- |
+| `search_knowledge_base` | Semantic search over Notion and Drive, plus exact matching of rare names |
+| `get_document` | Reads a whole document in parts when search fragments are not enough |
+| `find_person` | Member profile by name, surname or Telegram username |
+| `find_by_position` | Who holds or held a position, current and past |
+| `query_members` | Counts and groups members by status, family, mentor or intake date |
+| `who_am_i` | MCP only: the asking member's card and the drives they can search |
+
+## Evaluation
+
+Search is checked separately from answers. Each regression question has a known correct document, and a script runs the same search the bot uses and records the rank of that document among the returned documents. The bot puts all 25 returned fragments into the model context, so the main metric is whether the document appears in them at all (recall@25). MRR averages 1/rank, so 1.0 means the document always ranks first.
+
+| Check (vector search, 21.11.2026) | Result |
+| --- | --- |
+| 57 regression questions, general knowledge base | recall@25 54/57, hit@5 53/57, MRR 0.856 |
+| Same questions for a member with 18 drives (35k chunks) | recall@25 53/57, hit@5 53/57, MRR 0.837 |
+| 183 known documents across 7 work drives | recall@25 167/183 with all drives, 172/183 with only their own drive |
+
+The answer model was chosen on 8 cases with fixed search results, graded by hand: `gemini-4-hydrogen-low` answered 7 of 8 without remarks with a median of 13.6 s per answer. That is about as fast as Flash Low (5 of 8, 13.0 s) and more careful with weak evidence.
+
+The sets are small and were written by the author, and some questions reuse words from the documents, so absolute ranks are somewhat optimistic. The numbers are most useful for comparing changes against each other.
 
 ## Setup
 
