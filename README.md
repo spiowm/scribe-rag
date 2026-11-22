@@ -6,6 +6,12 @@
 
 <p align="center">A Telegram assistant that answers questions from BEST Lviv members and links to its sources in Notion and Google Drive. Also available via MCP.</p>
 
+<p align="center">
+  <a href="https://github.com/spiowm/scribe-rag/actions/workflows/ci.yml"><img src="https://github.com/spiowm/scribe-rag/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white" alt="Python 3.12+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
+
 <p align="center"><a href="#demo">Demo</a> · <a href="#architecture">Architecture</a> · <a href="#setup">Setup</a></p>
 
 ## Demo
@@ -18,8 +24,8 @@ Scribe answers questions about BEST Lviv in Ukrainian and links to the documents
     <th>Claude via MCP</th>
   </tr>
   <tr>
-    <td valign="top"><img src="docs/assets/demo-telegram.webp" width="340" alt="Telegram exchange in Ukrainian: the bot searches the knowledge base, answers what BEST Lviv is and lists three source links"></td>
-    <td valign="top"><img src="docs/assets/demo-mcp.webp" width="460" alt="Claude calls the Scribe knowledge-base search tool and answers how BEST Training Week works, with links to Notion pages"></td>
+    <td valign="top"><img src="docs/assets/demo-telegram.webp" height="500" alt="Telegram exchange in Ukrainian: the bot searches the knowledge base, answers what BEST Lviv is and lists three source links"></td>
+    <td valign="top"><img src="docs/assets/demo-mcp.webp" height="500" alt="Claude calls the BEST Lviv knowledge-base search tool and answers how BEST Training Week works, citing Notion pages"></td>
   </tr>
 </table>
 
