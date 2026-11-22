@@ -76,12 +76,6 @@ The answer model in Telegram and MCP clients call the same read-only tools. [Too
 
 Search is checked separately from answers. Each regression question has a known correct document, and a script runs the same search the bot uses and records the rank of that document among the returned documents. The bot puts all 25 returned fragments into the model context, so the main metric is whether the document appears in them at all (recall@25). MRR averages 1/rank, so 1.0 means the document always ranks first.
 
-The [regression script](backend/eval/retrieval.py) runs from `backend/` against an indexed Qdrant and embeds every question with the Gemini API. 52 of the 57 questions are in [`cases.json`](backend/eval/cases.json). The other five point to members' personal application letters, so they are kept out of the repository and passed as a second `--cases` file.
-
-```bash
-uv run --env-file ../.env python eval/retrieval.py --show-misses
-```
-
 | Check (vector search, 21.11.2026) | Result |
 | --- | --- |
 | 57 regression questions, general knowledge base | recall@25 54/57, hit@5 53/57, MRR 0.856 |
@@ -91,6 +85,12 @@ uv run --env-file ../.env python eval/retrieval.py --show-misses
 The answer model was chosen on 8 cases with fixed search results, graded by hand: `gemini-4-hydrogen-low` answered 7 of 8 without remarks with a median of 13.6 s per answer. That is about as fast as Flash Low (5 of 8, 13.0 s) and more careful with weak evidence.
 
 The sets are small and were written by the author, and some questions reuse words from the documents, so absolute ranks are somewhat optimistic. The numbers are most useful for comparing changes against each other.
+
+The [regression script](backend/eval/retrieval.py) runs from `backend/` against an indexed Qdrant and embeds every question with the Gemini API. 52 of the 57 questions are in [`cases.json`](backend/eval/cases.json). The other five point to members' personal application letters, so they are kept out of the repository and passed as a second `--cases` file.
+
+```bash
+uv run --env-file ../.env python eval/retrieval.py --show-misses
+```
 
 ## Setup
 
