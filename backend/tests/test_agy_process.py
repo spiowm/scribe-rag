@@ -48,3 +48,28 @@ def test_init_gives_conversation(tmp_path):
         tmp_path, json.dumps({"event": "init", "conversation_id": "c1"})
     )
     assert start(tmp_path, bin_path) == "c1"
+
+
+CALLS = {
+    "action": "call_tools",
+    "tool_calls": [{"name": "find_person", "args_json": "{}"}],
+}
+
+
+def test_stale_structured_output_gives_text_answer():
+    from src.generation.agy_process import stale_answer
+
+    result = {"structured_output": CALLS, "response": "Готова відповідь текстом."}
+    assert stale_answer(result, CALLS) == "Готова відповідь текстом."
+
+
+def test_fresh_or_repeated_on_purpose_is_not_stale():
+    from src.generation.agy_process import stale_answer
+
+    same = json.dumps(CALLS)
+    # новий вивід, хоч текст і не JSON
+    assert stale_answer({"structured_output": CALLS, "response": "текст"}, None) is None
+    # модель справді повторила ті самі виклики: текст — той самий JSON
+    assert stale_answer({"structured_output": CALLS, "response": same}, CALLS) is None
+    fenced = f"```json\n{same}\n```"
+    assert stale_answer({"structured_output": CALLS, "response": fenced}, CALLS) is None

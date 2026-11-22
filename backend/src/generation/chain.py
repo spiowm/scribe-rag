@@ -77,7 +77,8 @@ def run_record(run: dict, seconds: float) -> dict:
         "seconds": round(seconds, 1),
         "calls": run.get("journal") or [],
     }
-    for key in ("tokens", "errors"):  # токени рахує лише agy, помилки — рідкість
+    # токени й застарілий вивід бувають лише в agy, помилки — рідкість
+    for key in ("tokens", "errors", "stale"):
         if run.get(key):
             record[key] = run[key]
     return record
@@ -259,6 +260,11 @@ class RagChain:
                     current_run()["steps"] = step_no
                     result = await proc.send(text)
                     _add_tokens(run, result)
+                    if result.get("stale_structured"):
+                        logger.warning(
+                            "agy: structured_output попереднього ходу, відповідь з тексту"
+                        )
+                        run["stale"] = run.get("stale", 0) + 1
                     step = agy_protocol.parse_step(result)
                     if step.empty:
                         raise AgyError("модель повернула порожній хід")

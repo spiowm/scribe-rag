@@ -8,6 +8,33 @@ class AgyError(Exception):
     """Будь-який збій agy: не стартував, упав, тайм-аут, помилка у відповіді."""
 
 
+def _as_json(text: str) -> object:
+    """Текст відповіді як JSON, зокрема загорнутий у ```json … ```; інакше None."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def stale_answer(result: dict, previous: object) -> str | None:
+    """Текст відповіді, якщо `structured_output` лишився з попереднього ходу.
+
+    Структурований вивід agy — це виклик внутрішнього `finish`. Коли модель
+    на пізньому ході пише відповідь звичайним текстом без `finish`, agy не
+    завжди її доганяє й віддає `structured_output` попереднього ходу. Тоді
+    повторювались уже виконані виклики, а готова відповідь губилась
+    (4 з 9 багатокрокових прогонів на проді 21.11.2026).
+    """
+    data = result.get("structured_output")
+    text = (result.get("response") or "").strip()
+    if not isinstance(data, dict) or data != previous or not text:
+        return None
+    return None if _as_json(text) == data else text
+
+
 class AgyProcess:
     def __init__(
         self,
@@ -27,6 +54,7 @@ class AgyProcess:
         self.proc: asyncio.subprocess.Process | None = None
         self.conversation_id: str | None = None
         self.last_usage: dict = {}
+        self.last_structured: object = None  # щоб розпізнати застарілий вивід
         self.resumed: bool = False  # чи відкрилась саме та розмова, що просили
         self.started_at: float = 0.0
 
@@ -140,6 +168,11 @@ class AgyProcess:
                 k: usage.get(k, 0) - self.last_usage.get(k, 0) for k in keys
             }
             self.last_usage = {k: usage.get(k, 0) for k in keys}
+            if (text := stale_answer(result, self.last_structured)) is not None:
+                result["structured_output"] = {"action": "answer", "answer": text}
+                result["stale_structured"] = True
+            else:
+                self.last_structured = result.get("structured_output")
             return result
 
     async def close(self) -> None:
