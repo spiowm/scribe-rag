@@ -1,5 +1,8 @@
+import html
+
 import httpx
 from aiogram import F, Router, types
+from aiogram.filters import Command
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from src.api_client import ApiClient
@@ -23,6 +26,32 @@ starter_kb = ReplyKeyboardMarkup(
     one_time_keyboard=True,
     input_field_placeholder="Або напиши своє питання",
 )
+
+
+# Що вміє бот: після /start, після підтвердження членства й на /help.
+# HTML, бо в звичайному повідомленні rich-розмітка не потрібна.
+HELP = (
+    "🤖 <b>Я асистент BEST Lviv</b>\n"
+    "Знаю про людей, івенти, процеси й документи осередку: шукаю в Notion "
+    "і на дисках, до яких маєш доступ.\n"
+    "\n"
+    "💬 <b>Як питати</b>\n"
+    "Розмову пам'ятаю, тож можна уточнювати.\n"
+    "<i>Думання</i> — що я шукав, 📚 <i>Джерела</i> — звідки відповідь. "
+    "Тапни, щоб розгорнути.\n"
+    "👍 / 👎 під відповіддю допомагають мені ставати кращим.\n"
+    "\n"
+    "⌨️ <b>Команди</b>\n"
+    "/new — нова розмова з чистого аркуша\n"
+    "/drives — де я шукаю, вмикай і вимикай диски\n"
+    "/mcp_login — база BEST Lviv у твоєму Claude, Gemini чи ChatGPT\n"
+    "/help — ця підказка"
+)
+
+
+@router.message(Command("help"))
+async def cmd_help(message: types.Message):
+    await message.reply(HELP, parse_mode="HTML")
 
 
 @router.message(F.contact)
@@ -57,7 +86,9 @@ async def on_contact(message: types.Message, api_client: ApiClient):
         return
 
     await message.answer(
-        f"Вітаю, {user.first_name}! Доступ відкрито.\n\n"
+        f"Вітаю, {html.escape(user.first_name)}! Доступ відкрито.\n\n"
+        f"{HELP}\n\n"
         "Тицьни питання знизу, щоб спробувати, або пиши своє.",
+        parse_mode="HTML",
         reply_markup=starter_kb,
     )

@@ -247,7 +247,10 @@ def test_sources_get_drive_labels_and_searched_line(monkeypatch):
         "<sub>Шукав у: Notion, загальний диск, BTW, EBEC</sub>",
         "</details>",
     ]
-    assert out.startswith("Відповідь.\n\n<details><summary>📚 Джерела</summary>\n\n- [")
+    # п'ять пунктів: рядок із двома посиланнями — один пункт
+    assert out.startswith(
+        "Відповідь.\n\n<details><summary>📚 Джерела (5)</summary>\n\n- ["
+    )
     assert len(asked[0]) == 6
 
 
@@ -266,7 +269,9 @@ def test_tagging_failure_keeps_reply(monkeypatch):
         raise RuntimeError("db down")
 
     monkeypatch.setattr(sources.documents, "places", broken)
-    assert asyncio.run(sources.tag_sources(None, REPLY, facts())) == REPLY  # pyright: ignore[reportArgumentType]
+    out = asyncio.run(sources.tag_sources(None, REPLY, facts()))  # pyright: ignore[reportArgumentType]
+    # без позначок дисків, але з кількістю: вона не залежить від БД
+    assert out == REPLY.replace("Джерела</summary>", "Джерела (5)</summary>")
 
 
 def test_mcp_who_am_i_includes_drives(monkeypatch):

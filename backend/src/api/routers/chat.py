@@ -56,6 +56,31 @@ def build_footer(run: dict, seconds: float, window: chats.Window) -> str:
     return f"\n\n<sub>_{line}_</sub>"
 
 
+def build_record(run: dict, seconds: float, window: chats.Window) -> dict:
+    """Запис біля відповіді; `cut` — пам'ять уже не вміщала початок розмови."""
+    record = run_record(run, seconds)
+    if window.truncated:
+        record["cut"] = True
+    return record
+
+
+async def build_context_hint(
+    db: AsyncSession, session_id: int, window: chats.Window
+) -> str:
+    """Підказка про /new, коли початок розмови вже не вміщається в пам'ять.
+
+    Лише один раз: на першій такій відповіді. Якщо попередня відповідь уже
+    мала `cut`, підказку бачили, і під кожним повідомленням вона б набридла.
+    Рахується до запису нової відповіді, бо інакше «попередньою» стане вона.
+    """
+    if not window.truncated or await chats.last_reply_cut(db, session_id):
+        return ""
+    # Команда поза курсивом: `/new_` Телеграм міг би прочитати як іншу команду.
+    return (
+        "\n\n<sub>_Розмова вже довга, і її початок я забуваю._ /new — почати нову</sub>"
+    )
+
+
 def build_tools_block(run: dict) -> str:
     """Згорнуте «Думання» перед відповіддю: що саме бот робив."""
     calls = run.get("calls") or []
@@ -65,7 +90,7 @@ def build_tools_block(run: dict) -> str:
         f"↳ {TOOLS[name].icon if name in TOOLS else '⚙'} {text}" for name, text in calls
     )
     return (
-        f"<details><summary><sub>_Думання_</sub></summary>\n"
+        f"<details><summary><sub>_Думання ({len(calls)})_</sub></summary>\n"
         f"<sub>_{items}_</sub>\n</details>\n\n"
     )
 
@@ -102,6 +127,7 @@ async def process_message_stream(
     try:
         session = await chats.get_or_create_session(db, user.id)
         window = await chats.get_history_window(db, session.id)
+        hint = await build_context_hint(db, session.id, window)
         member, scopes = await access.caller(db, chain.mongo, user)
         drives = await access.drive_facts(db, user.id, member, settings.GOOGLE_DRIVES)
     except BaseException:
@@ -150,7 +176,11 @@ async def process_message_stream(
                 # У БД — без позначок: історія йде назад у модель, і вона
                 # почала б писати їх сама.
                 answer = await chats.add_message(
-                    db, session.id, "assistant", reply, run_record(info, seconds)
+                    db,
+                    session.id,
+                    "assistant",
+                    reply,
+                    build_record(info, seconds, window),
                 )
                 shown = await tag_sources(db, reply, drives)
                 yield (
@@ -161,6 +191,7 @@ async def process_message_stream(
                             "message_id": answer.id,
                             "text": build_tools_block(info)
                             + shown
+                            + hint
                             + build_footer(info, seconds, window),
                         }
                     )
@@ -187,6 +218,7 @@ async def process_message(
     try:
         session = await chats.get_or_create_session(db, user.id)
         window = await chats.get_history_window(db, session.id)
+        hint = await build_context_hint(db, session.id, window)
 
         member, scopes = await access.caller(db, chain.mongo, user)
         drives = await access.drive_facts(db, user.id, member, settings.GOOGLE_DRIVES)
@@ -203,11 +235,14 @@ async def process_message(
         run = LAST_RUN.get() or {}
         await chats.add_message(db, session.id, "user", request.message)
         await chats.add_message(
-            db, session.id, "assistant", reply, run_record(run, seconds)
+            db, session.id, "assistant", reply, build_record(run, seconds, window)
         )
         shown = await tag_sources(db, reply, drives)
         return ChatResponse(
-            reply=build_tools_block(run) + shown + build_footer(run, seconds, window)
+            reply=build_tools_block(run)
+            + shown
+            + hint
+            + build_footer(run, seconds, window)
         )
     finally:
         free_slot(user.id)

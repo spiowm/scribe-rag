@@ -1,3 +1,5 @@
+import html
+
 import httpx
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart
@@ -5,7 +7,7 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 from src.api_client import ApiClient
 from src.config import settings
-from src.handlers.onboarding import starter_kb
+from src.handlers.onboarding import HELP, starter_kb
 
 router = Router()
 
@@ -62,17 +64,21 @@ async def cmd_start(message: types.Message, api_client: ApiClient):
         user = None  # бекенд недоступний: показуємо кнопку, прив'язка сама скаже, що не так
     if user is not None:
         await message.reply(
-            f"З поверненням, {user.first_name}!\n\n"
+            f"З поверненням, {html.escape(user.first_name)}!\n\n"
+            f"{HELP}\n\n"
             "Тицьни питання знизу, щоб спробувати, або пиши своє.",
+            parse_mode="HTML",
             reply_markup=starter_kb,
         )
         return
 
-    name = message.from_user.first_name
+    name = html.escape(message.from_user.first_name)
     await message.reply(
-        text=f"Привіт, {name}! Я асистент BEST Lviv.\n"
-        "Просто напиши питання — і я знайду відповідь у нашій базі знань.\n"
-        "Щоб користуватись ботом, підтверди, що ти член BEST Lviv, надіславши номер телефону",
+        f"Привіт, {name}!\n\n"
+        f"{HELP}\n\n"
+        "🔐 <b>Спершу</b> підтверди, що ти член BEST Lviv: поділись номером "
+        "телефону кнопкою знизу.",
+        parse_mode="HTML",
         reply_markup=kb,
     )
 

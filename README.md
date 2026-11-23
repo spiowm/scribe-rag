@@ -52,7 +52,7 @@ The Telegram bot streams answers from the backend, which runs the answer model a
 
 During sync, the backend extracts content from Notion and Google Drive, stores the text in PostgreSQL, splits it into chunks, embeds them with Gemini and indexes them in Qdrant. PostgreSQL also keeps Telegram chat history, linked user accounts and MCP OAuth data. MongoDB holds the read-only member directory.
 
-Search in Telegram and MCP uses the drives available to the member. The Telegram command `/drives` shows their drive access. The bot answers only in private chats and ignores groups and channels, so replies and MCP sign-in codes stay with the member who asked. Disable group joining for the bot in BotFather with `/setjoingroups`.
+Search in Telegram and MCP uses the drives available to the member. The Telegram command `/drives` shows their drive access, and `/help` lists the bot's commands. The bot answers only in private chats and ignores groups and channels, so replies and MCP sign-in codes stay with the member who asked. Disable group joining for the bot in BotFather with `/setjoingroups`.
 
 - **Rare names.** A single query embedding drives semantic search and extra queries filtered to individual rare names within the member’s allowed sources. Each filter gives matching chunks their own candidate pool before the backend deduplicates and ranks them. [Search implementation](backend/src/vectorstore/qdrant.py#L86-L144)
 - **Index updates.** A sync copies unchanged points into a new collection and embeds changed chunks. The live search alias switches after the replacement collection is populated and passes a size check. [Reindexing](backend/src/vectorstore/qdrant.py#L260-L280) · [Alias switch](backend/src/vectorstore/qdrant.py#L323-L333)
