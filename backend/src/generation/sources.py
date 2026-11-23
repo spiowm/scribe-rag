@@ -24,7 +24,7 @@ GENERAL_DRIVE = "загальний диск"
 # Останній згортний блок джерел; заголовок — як у промпті, з будь-якою оздобою.
 BLOCK = re.compile(
     r"<details>\s*<summary>(?:(?!</summary>)[^\n])*Джерела(?:(?!</summary>)[^\n])*"
-    r"</summary>(?P<body>.*?)</details>",
+    r"(?P<close></summary>)(?P<body>.*?)</details>",
     re.DOTALL | re.IGNORECASE,
 )
 # Посилання markdown: назва буває з власними дужками (`[[ML][XXIV Board] …](url)`),
@@ -97,11 +97,30 @@ def annotate(reply: str, labels: dict[str, str], where: list[str]) -> str:
     return reply[:start] + body + "\n" + reply[end:]
 
 
+def count_items(reply: str) -> str:
+    """Кількість пунктів у заголовку блоку джерел: `📚 Джерела (3)`.
+
+    Пункт — рядок із посиланням, тож два посилання в одному рядку дають один.
+    Видно, скільки джерел, ще до розгортання блоку.
+    """
+    blocks = list(BLOCK.finditer(reply))
+    if not blocks:
+        return reply
+    block = blocks[-1]
+    n = sum(1 for line in block["body"].split("\n") if LINK.search(line))
+    if not n:
+        return reply
+    at = block.start("close")
+    return f"{reply[:at]} ({n}){reply[at:]}"
+
+
 async def tag_sources(db: AsyncSession, reply: str, facts: DriveFacts) -> str:
-    """Відповідь із позначками дисків. Окраса: збій — відповідь як була."""
+    """Відповідь із кількістю джерел і позначками дисків. Окраса: збій —
+    відповідь без позначок."""
     urls = source_urls(reply)
     if not urls:
         return reply
+    reply = count_items(reply)
     try:
         keys = {url_key(u) for u in urls}
         places = await documents.places(db, keys)

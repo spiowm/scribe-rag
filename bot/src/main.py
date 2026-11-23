@@ -30,6 +30,17 @@ dp.include_router(drives.router)
 dp.include_router(chat.router)
 
 
+# Ліміти Телеграма: 512 і 120 символів.
+DESCRIPTION = (
+    "Асистент BEST Lviv. Відповідає на питання про людей, івенти, процеси й "
+    "документи осередку і дає посилання на джерела.\n\n"
+    "Для членів BEST Lviv: після Start підтверди членство номером телефону."
+)
+SHORT_DESCRIPTION = (
+    "Асистент BEST Lviv: відповіді з бази знань осередку з посиланнями на джерела."
+)
+
+
 async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
     dispatcher["api_client"] = ApiClient(base_url=settings.BACKEND_URL)
     # Меню команд живе на боці Телеграма, тому ставиться при старті.
@@ -38,8 +49,12 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
         BotCommand(command="new", description="Нова розмова"),
         BotCommand(command="drives", description="Де шукати"),
         BotCommand(command="mcp_login", description="Код входу для MCP"),
+        BotCommand(command="help", description="Що я вмію"),
     ]
     await bot.set_my_commands(menu, scope=BotCommandScopeAllPrivateChats())
+    # Опис видно в порожньому чаті до Start, короткий — у профілі бота.
+    await bot.set_my_description(DESCRIPTION)
+    await bot.set_my_short_description(SHORT_DESCRIPTION)
     if settings.ADMIN_TELEGRAM_ID:
         # Окремою областю, а не в загальному меню: /admin не має світитись усім.
         await bot.set_my_commands(

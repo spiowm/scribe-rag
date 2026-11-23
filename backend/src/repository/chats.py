@@ -98,6 +98,20 @@ async def get_history_window(
     return Window(list(reversed(kept)), used, truncated)
 
 
+async def last_reply_cut(db: AsyncSession, session_id: int) -> bool:
+    """Чи попередній відповіді бота вже бракувало пам'яті на початок розмови.
+
+    Позначка `cut` у журналі прогону; журнал `deferred`, тож окремим запитом.
+    """
+    run = await db.scalar(
+        select(Message.run)
+        .where(Message.session_id == session_id, Message.role == "assistant")
+        .order_by(Message.id.desc())
+        .limit(1)
+    )
+    return bool((run or {}).get("cut"))
+
+
 async def set_rating(
     db: AsyncSession, message_id: int, user_id: int, value: int
 ) -> bool:

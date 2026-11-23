@@ -21,7 +21,8 @@ class Message(Base):
     rating: Mapped[int | None] = mapped_column(nullable=True)
     # Як зібрано відповідь: кроки, виклики з аргументами й знайденими
     # source_id, токени, секунди, модель. Лише в повідомленнях бота; повних
-    # результатів інструментів тут немає. Формат — `chain.run_record`.
+    # результатів інструментів тут немає. Формат — `chain.run_record`;
+    # `cut` — пам'ять уже не вміщала початок розмови (`routers.chat.build_record`).
     # deferred: історію для моделі читають по 200 повідомлень, і журнал їй не потрібен.
     # none_as_null: інакше None з Python лягає JSON-значенням `null`, а не NULL.
     run: Mapped[dict[str, Any] | None] = mapped_column(
