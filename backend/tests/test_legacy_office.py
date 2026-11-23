@@ -28,6 +28,19 @@ def test_doc_paragraphs_and_table_rows():
     assert "Відповідальна — Оля, ґанок і їжак на місці." in lines
 
 
+def test_doc_rtf_codepage_and_unicode():
+    # Word зберігає RTF і з типом .doc: кирилиця байтами cp1251 через \'hh
+    # і символами \uN, абзаци — \par
+    rtf = (
+        rb"{\rtf1\ansi\ansicpg1251\deff0{\fonttbl{\f0\fcharset204 Times;}}"
+        rb"\f0 \'c7\'e0\'f2\'e2\'e5\'f0\'e4\'e6\'e5\'ed\'ee\par"
+        rb"\u1169?\u1072?\u1085?\u1086?\u1082? \u1110? \u1111?\u1078?\u1072?\u1082?\par}"
+    )
+    text, pages = doc_text(rtf)
+    assert pages == 0
+    assert text.splitlines() == ["Затверджено", "ґанок і їжак"]
+
+
 @pytest.mark.skipif(not shutil.which("antiword"), reason="немає antiword")
 def test_doc_not_word_raises():
     with pytest.raises(ValueError, match="antiword"):

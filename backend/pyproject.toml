@@ -24,6 +24,7 @@ dependencies = [
     "python-pptx>=1.0.2",
     "qdrant-client>=1.18.0",
     "sqlalchemy>=2.0.50",
+    "striprtf>=0.0.35",
     "uvicorn>=0.48.0",
     "xlrd>=2.0.2",
 ]
