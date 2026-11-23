@@ -74,6 +74,8 @@ docker start "$BE"
 
 The entrypoint generates a keyring password and stores it in the volume when `KEYRING_PW` is empty. If the deployment sets an explicit password, pass the same `KEYRING_PW` to the one-off container through a protected env file. On SELinux hosts, use shared labeling (`:z`) if relabeling is needed.
 
+On startup the backend also writes `.gemini/antigravity-cli/settings.json` in the agy home. It adds deny rules for shell commands, file access and URL tools and sets `telemetryEnabled` to false, keeping any other keys. agy 1.2.10 has no rule for its built-in web search, so `search_web` stays available. The setting is not a substitute for the data-usage settings of the Antigravity account. [Settings writer](../backend/src/generation/agy_process.py)
+
 If agy answers fail, check the backend logs for authentication errors and repeat sign-in if needed. The home volume preserves the keyring across container replacements. The reply footer shows the answering provider when a response succeeds.
 
 ## Host development

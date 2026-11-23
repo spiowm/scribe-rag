@@ -14,7 +14,7 @@ from google.genai import types
 from src.config import settings
 from src.connectors.mongo import MongoConnector
 from src.generation import agy_protocol, models_check, tools
-from src.generation.agy_process import AgyError, AgyProcess
+from src.generation.agy_process import AgyError, AgyProcess, write_settings
 from src.generation.prompts import BOT_PROMPT, user_context
 from src.models.message import Message
 from src.vectorstore.qdrant import QdrantRepository
@@ -145,6 +145,7 @@ class RagChain:
                 encoding="utf-8",
             )
             self.agy_schema_path = str(schema_file)
+            write_settings(Path(settings.AGY_HOME))
 
     def _system_instruction(self, member: dict | None = None, drives: str = "") -> str:
         """Системний промпт із поточною датою, профілем співрозмовника і його

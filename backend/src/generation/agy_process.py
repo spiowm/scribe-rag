@@ -2,10 +2,52 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
+
+# Вбудовані інструменти agy, які боту не потрібні: shell, файли, читання й
+# виконання URL. Headless-режим 1.2.10 і так їх відхиляє, а явні правила не
+# залежать від дефолту версії. Правил для search_web у 1.2.10 немає: формат
+# дозволяє лише command, read_file, write_file, read_url, mcp, execute_url і
+# unsandboxed (перевірено 23.11.2026).
+DENY = ("command(*)", "read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)")
 
 
 class AgyError(Exception):
     """Будь-який збій agy: не стартував, упав, тайм-аут, помилка у відповіді."""
+
+
+def write_settings(home: Path) -> Path:
+    """Дописує в settings.json agy заборони інструментів і вимкнену телеметрію.
+
+    `telemetryEnabled` agy 1.2.10 приймає, але й з ним викликає
+    recordTrajectoryAnalytics; налаштування акаунта цей ключ не замінює.
+    Інші ключі файлу й наявні правила зберігаються. Файл, який не читається
+    як JSON-об'єкт, замінюється: без заборон agy запускати не слід.
+    """
+    path = home / ".gemini" / "antigravity-cli" / "settings.json"
+    try:
+        current = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        current = {}
+    if not isinstance(current, dict):
+        current = {}
+    permissions = current.get("permissions")
+    if not isinstance(permissions, dict):
+        permissions = {}
+    deny = permissions.get("deny")
+    deny = (
+        [rule for rule in deny if isinstance(rule, str)]
+        if isinstance(deny, list)
+        else []
+    )
+    permissions["deny"] = [*deny, *(rule for rule in DENY if rule not in deny)]
+    current["permissions"] = permissions
+    current["telemetryEnabled"] = False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+    return path
 
 
 def _as_json(text: str) -> object:

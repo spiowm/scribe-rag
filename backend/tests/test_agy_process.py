@@ -1,9 +1,10 @@
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 
-from src.generation.agy_process import AgyError, AgyProcess
+from src.generation.agy_process import DENY, AgyError, AgyProcess, write_settings
 
 # Те, що agy 1.2.10 друкує без логіну (заміряно в контейнері 08.11).
 NOT_SIGNED_IN = {
@@ -73,3 +74,48 @@ def test_fresh_or_repeated_on_purpose_is_not_stale():
     assert stale_answer({"structured_output": CALLS, "response": same}, CALLS) is None
     fenced = f"```json\n{same}\n```"
     assert stale_answer({"structured_output": CALLS, "response": fenced}, CALLS) is None
+
+
+def settings_file(home: Path) -> Path:
+    return home / ".gemini" / "antigravity-cli" / "settings.json"
+
+
+def test_settings_written_on_clean_home(tmp_path):
+    path = write_settings(tmp_path)
+    assert path == settings_file(tmp_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data == {"permissions": {"deny": list(DENY)}, "telemetryEnabled": False}
+
+
+def test_settings_keep_other_keys_and_rules(tmp_path):
+    path = settings_file(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "model": "x",
+                "telemetryEnabled": True,
+                "permissions": {"allow": ["mcp(a)"], "deny": ["mcp(b)", "command(*)"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    write_settings(tmp_path)
+    write_settings(tmp_path)  # повторний старт нічого не дублює
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["model"] == "x"
+    assert data["telemetryEnabled"] is False
+    assert data["permissions"]["allow"] == ["mcp(a)"]
+    deny = data["permissions"]["deny"]
+    assert deny[:2] == ["mcp(b)", "command(*)"]
+    assert sorted(deny) == sorted({"mcp(b)", *DENY})
+
+
+def test_broken_settings_replaced(tmp_path):
+    path = settings_file(tmp_path)
+    path.parent.mkdir(parents=True)
+    for broken in ("{not json", "[1, 2]", '{"permissions": "all"}'):
+        path.write_text(broken, encoding="utf-8")
+        write_settings(tmp_path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["permissions"]["deny"] == list(DENY)
