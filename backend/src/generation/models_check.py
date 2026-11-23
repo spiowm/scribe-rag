@@ -52,7 +52,9 @@ async def check(client: genai.Client) -> dict[str, str]:
     global AGY_BLOCKED
     problems: dict[str, str] = {}
     blocked = None
-    if settings.LLM_PROVIDER == "agy":
+    if settings.LLM_PROVIDER == "agy" and not settings.AGY_MODEL:
+        blocked = problems["AGY_MODEL"] = "AGY_MODEL не задано; список — agy models"
+    elif settings.LLM_PROVIDER == "agy":
         try:
             available = await agy_models()
             if not available:

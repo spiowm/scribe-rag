@@ -68,7 +68,10 @@ class Settings(BaseSettings):
     AGY_BIN: str = "agy"
     AGY_HOME: str = str(Path.home() / ".agy-bot")
     AGY_WORKDIR: str = str(Path.home() / ".agy-bot-ws")
-    AGY_MODEL: str = "gemini-3.8-flash-low"
+    # Без дефолту: моделі agy змінюються часто, тож id задається явно
+    # (список — `agy models`). Порожнє значення блокує відповіді через agy
+    # з причиною в /admin, див. models_check.
+    AGY_MODEL: str = ""
     AGY_TURN_TIMEOUT: float = 120
     AGY_MAX_PROCS: int = 10
     AGY_STATE_TTL_DAYS: float = 3

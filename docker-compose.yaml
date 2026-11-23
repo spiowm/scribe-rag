@@ -40,6 +40,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
       MONGO_URI: ${MONGO_URI:?}
       GOOGLE_DRIVE_CREDENTIALS_JSON: ${GOOGLE_DRIVE_CREDENTIALS_JSON:?}
+      # модель відповідей agy без дефолту; список — `agy models`
+      AGY_MODEL: ${AGY_MODEL:-}
       # робочі диски в пошуку (id через кому); порожньо — лише загальне
       GOOGLE_DRIVE_IDS: ${GOOGLE_DRIVE_IDS:-}
       GOOGLE_DRIVE_GENERAL_ID: ${GOOGLE_DRIVE_GENERAL_ID:-}
