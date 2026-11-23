@@ -11,11 +11,14 @@ from aiogram.types import (
 from src.api_client import ApiClient
 from src.config import settings
 from src.handlers import access, admin, chat, commands, drives, onboarding, rating
+from src.private_only import PrivateOnly
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher()
+# До всіх роутерів: у групах і каналах бот мовчить.
+dp.update.outer_middleware(PrivateOnly())
 
 dp.include_router(commands.router)
 dp.include_router(onboarding.router)
