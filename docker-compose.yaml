@@ -78,16 +78,18 @@ services:
       ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID:-}
       INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?задай INTERNAL_API_TOKEN, однаковий для backend і bot}"
       # Coolify дописує кожному сервісу `env_file` з усіма змінними застосунку,
-      # а `environment` має пріоритет. Секрети інших сервісів тому обнулено явно.
-      POSTGRES_PASSWORD: ""
-      NOTION_TOKEN: ""
-      GEMINI_API_KEY: ""
-      MONGO_URI: ""
-      GOOGLE_DRIVE_CREDENTIALS_JSON: ""
-      R2_ACCOUNT_ID: ""
-      R2_ACCESS_KEY_ID: ""
-      R2_SECRET_ACCESS_KEY: ""
-      KEYRING_PW: ""
+      # а `environment` має пріоритет. Секрети інших сервісів тому перекрито
+      # явно. Непорожнім рядком: порожній Coolify 4.1.2 замінює значенням
+      # змінної з панелі.
+      POSTGRES_PASSWORD: unused
+      NOTION_TOKEN: unused
+      GEMINI_API_KEY: unused
+      MONGO_URI: unused
+      GOOGLE_DRIVE_CREDENTIALS_JSON: unused
+      R2_ACCOUNT_ID: unused
+      R2_ACCESS_KEY_ID: unused
+      R2_SECRET_ACCESS_KEY: unused
+      KEYRING_PW: unused
     depends_on:
       backend:
         condition: service_started
@@ -112,16 +114,17 @@ services:
       GOOGLE_DRIVE_PAUSED_IDS: ${GOOGLE_DRIVE_PAUSED_IDS:-}
       # Публічному сервісу секрети Notion, Drive, R2, бота й внутрішнього API
       # не потрібні, а контейнер відкритий в інтернет. Coolify однаково
-      # дописує `env_file` з усіма змінними застосунку, тому їх обнулено явно:
-      # `environment` має пріоритет над `env_file`.
-      NOTION_TOKEN: ""
-      GOOGLE_DRIVE_CREDENTIALS_JSON: ""
-      R2_ACCOUNT_ID: ""
-      R2_ACCESS_KEY_ID: ""
-      R2_SECRET_ACCESS_KEY: ""
-      BOT_TOKEN: ""
-      INTERNAL_API_TOKEN: ""
-      KEYRING_PW: ""
+      # дописує `env_file` з усіма змінними застосунку, тому їх перекрито явно
+      # (`environment` має пріоритет над `env_file`). Непорожнім рядком:
+      # порожній Coolify 4.1.2 замінює значенням змінної з панелі.
+      NOTION_TOKEN: unused
+      GOOGLE_DRIVE_CREDENTIALS_JSON: unused
+      R2_ACCOUNT_ID: unused
+      R2_ACCESS_KEY_ID: unused
+      R2_SECRET_ACCESS_KEY: unused
+      BOT_TOKEN: unused
+      INTERNAL_API_TOKEN: unused
+      KEYRING_PW: unused
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${MCP_HOST_PORT:-8077}:8000"
     depends_on:
