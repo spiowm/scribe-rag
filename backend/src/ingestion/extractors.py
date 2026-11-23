@@ -11,6 +11,7 @@ from docx.table import Table as DocxTable
 from google import genai
 from google.genai import types
 from pptx import Presentation
+from striprtf.striprtf import rtf_to_text
 
 _PDFIUM_LOCK = threading.Lock()
 _BASE64_IMG = re.compile(r"data:[^;]+;base64,[A-Za-z0-9+/=]+")
@@ -96,15 +97,26 @@ def docx_text(blob: bytes) -> tuple[str, int]:
     return "\n".join(parts), 0
 
 
+def rtf_text(blob: bytes) -> tuple[str, int]:
+    """RTF: сам формат ASCII, байти поза ним — у кодовій сторінці з `\\ansicpg`,
+    яку `striprtf` читає з файлу. latin-1 переносить байти в рядок без втрат."""
+    text = rtf_to_text(blob.decode("latin-1"), errors="replace")
+    lines = (line.strip() for line in text.splitlines())
+    return "\n".join(line for line in lines if line), 0
+
+
 def doc_text(blob: bytes) -> tuple[str, int]:
     """Старий Word (.doc) через antiword: python-docx його не відкриває.
 
     `-w 0` — абзац одним рядком, без переносу за шириною. Рядки таблиць antiword
     вирівнює пробілами (`|Назва      |Значення    |`), тут вони стають `Назва | Значення`,
-    як у `docx_text`. Не-Word, який Drive теж позначає application/msword (RTF,
-    перейменований ODT — на 253 старих файлах дисків по одному), antiword не
-    читає — виняток, файл іде в `failed`.
+    як у `docx_text`. Drive позначає application/msword і RTF: Word зберігає його
+    з розширенням `.doc` або `.rtf` (на дисках з Boards — 18 таких файлів), тож
+    RTF розпізнається за сигнатурою. Інший не-Word (перейменований ODT) antiword
+    не читає — виняток, файл іде в `failed`.
     """
+    if blob.lstrip()[:5] == b"{\\rtf":
+        return rtf_text(blob)
     done = subprocess.run(
         ["antiword", "-m", "UTF-8.txt", "-w", "0", "-"],
         check=False,

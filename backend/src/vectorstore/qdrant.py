@@ -55,6 +55,9 @@ def term_forms(term: str) -> list[str]:
     return list(dict.fromkeys(forms))
 
 
+QDRANT_TIMEOUT = 30  # секунд
+
+
 class QdrantRepository:
     # Надбавка до скору загального (Notion і загальний диск), коли в пошуку є
     # і робочі диски: інакше списки й чернетки подій витісняють хендбуки з
@@ -80,7 +83,10 @@ class QdrantRepository:
         embedding_model: GoogleGenAIEmbedding,
     ) -> None:
         self.alias = collection_name
-        self.qdrant_client = AsyncQdrantClient(url=url)
+        # Явно: без нього REST-клієнт бере 5 с httpx. Scroll по колекції на 70 тис.
+        # точок одразу після рестарту Qdrant їх не вкладав, і синк Notion падав
+        # на `index_state` (23.11.2026).
+        self.qdrant_client = AsyncQdrantClient(url=url, timeout=QDRANT_TIMEOUT)
         self.embedding_model = embedding_model
 
     async def search(
