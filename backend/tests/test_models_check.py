@@ -3,6 +3,9 @@ import asyncio
 from src.config import settings
 from src.generation import models_check
 
+# дефолту в конфігу немає, тож модель для тестів задається тут
+AGY_MODEL = "gemini-3.8-flash-low"
+
 
 class FakeModels:
     def __init__(self, known):
@@ -24,12 +27,13 @@ def run(monkeypatch, agy_list, known):
 
     monkeypatch.setattr(models_check, "agy_models", fake_agy)
     monkeypatch.setattr(settings, "LLM_PROVIDER", "agy")
+    monkeypatch.setattr(settings, "AGY_MODEL", AGY_MODEL)
     return asyncio.run(models_check.check(FakeClient(known)))  # pyright: ignore[reportArgumentType]
 
 
 def test_all_present(monkeypatch):
     known = {settings.GEMINI_LLM_MODEL, settings.GEMINI_EMBEDDING_MODEL}
-    assert run(monkeypatch, {settings.AGY_MODEL}, known) == {}
+    assert run(monkeypatch, {AGY_MODEL}, known) == {}
     assert models_check.agy_missing() is None
 
 
@@ -40,8 +44,21 @@ def test_missing_agy_model_fails_fast(monkeypatch):
     assert "gemini-3.8-flash-high" in (models_check.agy_missing() or "")
 
 
+def test_empty_agy_model_blocks_without_calling_agy(monkeypatch):
+    async def fail():
+        raise AssertionError("agy models не мав викликатись")
+
+    monkeypatch.setattr(models_check, "agy_models", fail)
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "agy")
+    monkeypatch.setattr(settings, "AGY_MODEL", "")
+    known = {settings.GEMINI_LLM_MODEL, settings.GEMINI_EMBEDDING_MODEL}
+    problems = asyncio.run(models_check.check(FakeClient(known)))  # pyright: ignore[reportArgumentType]
+    assert set(problems) == {"AGY_MODEL"}
+    assert "не задано" in (models_check.agy_missing() or "")
+
+
 def test_missing_ocr_model_reported_without_blocking_chat(monkeypatch):
-    problems = run(monkeypatch, {settings.AGY_MODEL}, {settings.GEMINI_EMBEDDING_MODEL})
+    problems = run(monkeypatch, {AGY_MODEL}, {settings.GEMINI_EMBEDDING_MODEL})
     assert set(problems) == {"GEMINI_LLM_MODEL"}
     assert models_check.agy_missing() is None
 
